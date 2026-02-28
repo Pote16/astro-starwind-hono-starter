@@ -41,7 +41,7 @@ const routes = app.route("/api", exampleRouter);
 export type AppType = typeof routes;
 
 // --- Start Server ---
-const port = parseInt(process.env.PORT || "3000", 10);
+const port = parseInt(process.env.PORT || "3005", 10);
 logger.info(`Backend Starting on port ${port}...`);
 
 serve({
