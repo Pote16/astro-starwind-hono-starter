@@ -1,0 +1,51 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { getLangFromUrl } from "../i18n/utils";
+import { getHomeContent } from "../data/homeContent";
+
+const lang = getLangFromUrl(Astro.url);
+const homeContent = getHomeContent(lang);
+---
+
+<Layout title={homeContent.hero.title}>
+  <script is:inline slot="head">
+    const prefs = navigator.languages || [navigator.language];
+    if (prefs.some((l) => l.startsWith("en"))) {
+      window.location.replace("/en" + window.location.search);
+    }
+  </script>
+  <main
+    class="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4"
+  >
+    <div
+      class="max-w-3xl w-full bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center space-y-6"
+    >
+      <h1 class="text-4xl font-bold text-gray-900 tracking-tight">
+        {homeContent.hero.title}
+        <span class="text-blue-600">{homeContent.hero.starter}</span>
+      </h1>
+
+      <p class="text-lg text-gray-600 leading-relaxed max-w-2xl mx-auto">
+        {homeContent.hero.subtitle}
+      </p>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-8">
+        {
+          homeContent.features.map((feature) => (
+            <div class="bg-gray-50 rounded-xl p-6 border border-gray-100 text-left">
+              <h2 class="font-semibold text-gray-900 mb-2">{feature.title}</h2>
+              <p class="text-sm text-gray-600">{feature.description}</p>
+            </div>
+          ))
+        }
+      </div>
+
+      <div
+        class="mt-8 pt-6 border-t border-gray-100 flex justify-center gap-4 text-sm text-gray-500"
+      >
+        <a href="/" class="hover:underline hover:text-blue-600">DE</a>
+        <a href="/en" class="hover:underline hover:text-blue-600">EN</a>
+      </div>
+    </div>
+  </main>
+</Layout>

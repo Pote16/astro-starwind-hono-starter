@@ -1,0 +1,16 @@
+---
+description: Logging-Standards mit Pino im Monorepo
+globs: ["**/*.ts", "**/*.astro"]
+alwaysApply: false
+---
+
+# Logging mit Pino
+
+1. **Absolutes Verbot von console.log:**
+* Die Nutzung von `console.log`, `console.error` oder `console.warn` ist in Backend- und Frontend-Services strengstens untersagt.
+
+
+2. **Pino Implementierung:**
+* Importiere immer den vorkonfigurierten Pino-Logger aus dem Monorepo-Package `@hollyhub/logger`.
+* Nutze strukturierte JSON-Logs: `logger.info({ userId, roomId }, "Buchung erfolgreich abgeschlossen");`.
+* Logge bei Fehlern immer das gesamte Fehler-Objekt, um den Stacktrace in Produktionsumgebungen nicht zu verlieren.

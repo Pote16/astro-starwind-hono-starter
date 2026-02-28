@@ -1,0 +1,32 @@
+{
+  "name": "astro-hono-setup",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm -r --parallel run dev",
+    "dev:frontend": "pnpm --filter frontend run dev",
+    "dev:backend": "pnpm --filter backend run dev",
+    "build": "pnpm -r run build",
+    "lint": "pnpm -r run lint",
+    "lint:fix": "pnpm exec eslint apps/backend/src apps/frontend/src packages/db/src packages/logger/src --fix",
+    "outdated": "pnpm outdated -r",
+    "typecheck": "pnpm -r run typecheck",
+    "db:generate": "pnpm --filter @ho-setup/db run generate",
+    "db:push": "pnpm --filter @ho-setup/db run db:push",
+    "db:migrate": "pnpm --filter @ho-setup/db run db:migrate"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.3",
+    "eslint": "^9.15.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-astro": "^1.6.0",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
+    "eslint-plugin-simple-import-sort": "^12.1.1",
+    "globals": "^17.3.0",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.56.1"
+  },
+  "packageManager": "pnpm@9.14.2",
+  "engines": {
+    "node": ">=22"
+  }
+}

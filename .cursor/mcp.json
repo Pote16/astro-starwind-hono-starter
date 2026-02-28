@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "astro-mcp": {
+      "url": "http://localhost:4321/__mcp/sse"
+    },
+    "starwind-ui": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@starwind-ui/mcp"
+      ],
+      "env": {}
+    },
+    "astro": {
+      "url": "http://localhost:4321/__mcp/sse"
+    }
+  }
+}
