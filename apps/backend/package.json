@@ -15,16 +15,16 @@
     "@ho-setup/db": "workspace:*",
     "@ho-setup/logger": "workspace:*",
     "@hono/node-server": "^1.19.9",
-    "@hono/zod-validator": "^0.7.0",
+    "@hono/zod-validator": "^0.7.6",
     "dotenv": "^17.3.1",
-    "hono": "^4.6.0",
+    "hono": "^4.12.3",
     "hono-rate-limiter": "^0.5.3",
     "unstorage": "^1.17.4",
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@types/node": "^25.3.0",
-    "tsx": "^4.19.0",
-    "typescript": "^5.7.2"
+    "@types/node": "^25.3.3",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
   }
 }

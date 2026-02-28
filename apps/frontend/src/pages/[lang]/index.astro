@@ -1,8 +1,8 @@
 ---
-import Layout from "../../layouts/Layout.astro";
-import { getLangFromUrl } from "../../i18n/utils";
 import { getHomeContent } from "../../data/homeContent";
-import { languages, defaultLang, type Lang } from "../../i18n/ui";
+import { defaultLang, type Lang,languages } from "../../i18n/ui";
+import { getLangFromUrl } from "../../i18n/utils";
+import Layout from "../../layouts/Layout.astro";
 
 export function getStaticPaths() {
   const supportedLangs = Object.keys(languages) as Lang[];

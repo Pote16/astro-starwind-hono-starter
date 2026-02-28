@@ -1,7 +1,7 @@
 import { cors } from "hono/cors";
 import { csrf } from "hono/csrf";
-import { secureHeaders } from "hono/secure-headers";
 import { createMiddleware } from "hono/factory";
+import { secureHeaders } from "hono/secure-headers";
 
 // Globale Security Headers (XSS Protection, HSTS, etc.)
 export const secureHeadersMiddleware = secureHeaders();

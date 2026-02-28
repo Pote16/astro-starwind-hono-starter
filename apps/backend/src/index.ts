@@ -1,13 +1,12 @@
+import { logger } from "@ho-setup/logger";
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
-import { logger } from "@ho-setup/logger";
 
+import { errorHandler } from "./middleware/error-handler.js";
 // Import Middlewares
 import { loggerMiddleware } from "./middleware/logger.js";
-import { errorHandler } from "./middleware/error-handler.js";
 import { rateLimitMiddleware } from "./middleware/rate-limit.js";
-import { secureHeadersMiddleware, csrfMiddleware, corsMiddleware } from "./middleware/security.js";
-
+import { corsMiddleware,csrfMiddleware, secureHeadersMiddleware } from "./middleware/security.js";
 // Import Routes
 import exampleRouter from "./routes/example.js";
 
@@ -35,6 +34,7 @@ app.use("*", csrfMiddleware);
 
 // --- Mount Routes ---
 // RPC Types werden aus den routern generiert
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const routes = app.route("/api", exampleRouter);
 
 // Export RPC AppType for Frontend consumption

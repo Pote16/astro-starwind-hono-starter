@@ -9,7 +9,7 @@
 [![Hono](https://img.shields.io/badge/Hono%204-E36002?style=for-the-badge&logo=hono&logoColor=white)](https://hono.dev/)
 [![Starwind Pro](https://img.shields.io/badge/Starwind%20UI-0F172A?style=for-the-badge&logo=tailwindcss&logoColor=38bdf8)](https://starwind.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript%205-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL%2016-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL%2018-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 
   <br />
 </div>
@@ -80,7 +80,7 @@ Der Befehl startet Frontend und Backend gleichzeitig:
 │   ├── db/               # Datenbank-Schema & Migrations
 │   ├── logger/           # Geteilter Pino-Logger
 │   └── ui/               # Geteilte UI-Komponenten (optional)
-├── docker-compose.yml    # PG16 Datenbank
+├── docker-compose.yml    # PG18 Datenbank
 └── pnpm-workspace.yaml   # Monorepo Konfiguration
 ```
 

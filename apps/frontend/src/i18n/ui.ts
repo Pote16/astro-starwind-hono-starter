@@ -5,6 +5,8 @@ export const languages = {
 
 export const defaultLang = 'de';
 
+export type Lang = keyof typeof languages;
+
 export const ui = {
   de: {
     'nav.home': 'Startseite',

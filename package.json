@@ -15,17 +15,17 @@
     "db:migrate": "pnpm --filter @ho-setup/db run db:migrate"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.3",
+    "@eslint/js": "^10.0.1",
     "eslint": "^9.15.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-astro": "^1.6.0",
     "eslint-plugin-jsx-a11y": "^6.10.2",
     "eslint-plugin-simple-import-sort": "^12.1.1",
     "globals": "^17.3.0",
-    "typescript": "^5.7.2",
+    "typescript": "^5.9.3",
     "typescript-eslint": "^8.56.1"
   },
-  "packageManager": "pnpm@9.14.2",
+  "packageManager": "pnpm@10.30.3",
   "engines": {
     "node": ">=22"
   }

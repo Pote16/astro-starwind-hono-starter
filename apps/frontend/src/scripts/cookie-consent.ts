@@ -3,14 +3,15 @@
  * Opt-in: Keine Cookies vor expliziter Zustimmung
  * Sprache wird aus document.documentElement.lang ermittelt (i18n)
  */
-import * as CookieConsent from "vanilla-cookieconsent";
+import { run, showPreferences } from "vanilla-cookieconsent";
+
 import { appCookieConfig } from "../data/cookieConsentTypes";
 import { cookieConsentTranslations } from "../i18n/cookieConsent";
 
 const pageLang = document.documentElement.getAttribute("lang") ?? appCookieConfig.defaultLanguage;
 const currentLang = pageLang.startsWith("de") ? "de" : "en";
 
-CookieConsent.run({
+run({
   mode: "opt-in",
   revision: appCookieConfig.revision,
   cookie: {
@@ -56,4 +57,4 @@ declare global {
   }
 }
 
-window.showCookiePreferences = () => CookieConsent.showPreferences();
+window.showCookiePreferences = () => showPreferences();
