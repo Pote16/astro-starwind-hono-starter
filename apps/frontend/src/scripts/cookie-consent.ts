@@ -5,8 +5,14 @@
  */
 import { run, showPreferences } from "vanilla-cookieconsent";
 
-import { appCookieConfig } from "../data/cookieConsentTypes";
 import { cookieConsentTranslations } from "../i18n/cookieConsent";
+
+const appCookieConfig = {
+  defaultLanguage: "de",
+  cookieName: "cc_cookie",
+  expiresAfterDays: 182,
+  revision: 1
+};
 
 const pageLang = document.documentElement.getAttribute("lang") ?? appCookieConfig.defaultLanguage;
 const currentLang = pageLang.startsWith("de") ? "de" : "en";

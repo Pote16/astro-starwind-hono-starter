@@ -1,4 +1,11 @@
-// Placeholder für ESLint und TypeScript Compiler
-// Hier werden später die Prisma-Typen und Instanzen exportiert
+import { drizzle } from "drizzle-orm/bun-sql";
+import { SQL } from "bun";
+import * as schema from "./schema.js";
 
-export const placeholder = "Hier entsteht das DB Package";
+// Verhindert Error beim Build, wenn die Umgebungsvariable noch nicht gesetzt ist
+const connectionString = process.env.DATABASE_URL || "postgres://postgres:postgres@localhost:5435/starter";
+
+const client = new SQL(connectionString);
+export const db = drizzle({ client, schema });
+
+export * from "./schema.js";

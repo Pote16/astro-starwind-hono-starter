@@ -1,0 +1,22 @@
+---
+description: database guidelines for ai assistants using drizzle orm
+---
+
+# Database Guidelines
+
+This project uses Drizzle ORM configured with a PostgreSQL connection over Bun's SQL implementation. No Prisma dependencies exist here.
+
+## Drizzle ORM Config
+- Always reference `packages/db/drizzle.config.ts`.
+- The database connection string is read from the root `.env` under `DATABASE_URL`. Use local docker defaults if unset: `postgres://postgres:postgres@localhost:5435/starter`.
+
+## Schema Rules
+- Use `drizzle-orm/pg-core` for all table definitions in `packages/db/src/schema.ts` (e.g. `pgTable`, `varchar`, `timestamp`).
+- Structure it modularly: keep queries strictly typed.
+
+## Command Scripts
+- To generate new migrations after updating schema: `bun --filter @ho-setup/db db:generate`
+- To push schema directly (Dev only): `bun --filter @ho-setup/db db:push`
+- To run migrations: `bun --filter @ho-setup/db db:migrate`
+
+When an AI writes new backend endpoints (`apps/backend`), it should query using `db` from `@ho-setup/db` which instantiates Drizzle.

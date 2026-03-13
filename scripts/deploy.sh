@@ -1,57 +1,65 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Astro+Hono-Setup – Auto-Deploy (Monorepo: Astro Frontend + Hono Backend)
+# Astro+Hono Starter – Auto-Deploy
 # =============================================================================
 # Wird nach git pull vom Ploi-Deploy-Hook ausgeführt.
 # Muss aus dem Projektroot ausgeführt werden.
 #
-# PM2 wird von Ploi verwaltet (NodeJS-Settings: "Restart process after deployment").
-# Start command in Ploi: npx tsx apps/backend/src/index.ts
+# Ploi Daemon: bun run apps/backend/src/index.ts
 # =============================================================================
 
 set -e
 
-# .env aus Root laden
+# ── Bun PATH (wird von non-interactive shells nicht aus .bashrc geladen) ──────
+export BUN_INSTALL="$HOME/.bun"
+export PATH="$BUN_INSTALL/bin:$PATH"
+
+# ── .env laden ───────────────────────────────────────────────────────────────
 if [ -f .env ]; then
   set -a
   source .env 2>/dev/null || true
   set +a
 fi
 
-export PORT=3004
 export CI=true
 
 echo "============================================"
-echo "  Astro+Hono-Setup – Deploy"
+echo "  Deploy"
 echo "============================================"
-echo "Node: $(node -v) | pnpm: $(pnpm -v 2>/dev/null || echo 'n/a')"
+echo "Bun: $(bun -v 2>/dev/null || echo 'n/a')"
 
-# ── pnpm via Corepack sicherstellen ──────────────────────────────────────────
-corepack enable 2>/dev/null || true
-corepack prepare pnpm@9.14.2 --activate 2>/dev/null || true
+# ── Dependencies (Bun Workspaces) ────────
+echo "==> bun install"
+bun install
 
-# ── Dependencies installieren ────────────────────────────────────────────────
-echo "==> pnpm install"
-pnpm install
+# ── Datenbank ────────────────────────────────────────────────────────────────
+# echo "==> Drizzle Migrationen ausführen"
+# bun --filter @ho-setup/db db:migrate
 
-# ── Prisma Client generieren ────────────────────────────────────────────────
-echo "==> Prisma Client generieren"
-pnpm db:generate
+# ── Frontend Build (Astro/Vite) ──────────────────────────────────────────────
+echo "==> Alte Frontend-Artefakte entfernen"
+rm -rf apps/frontend/dist
 
-# ── Datenbank-Schema synchronisieren ─────────────────────────────────────────
-# TODO: Auf `prisma migrate deploy` umstellen, sobald Migrations vorhanden sind
-echo "==> Datenbank-Schema synchronisieren (prisma db push)"
-pnpm db:push
+echo "==> Frontend Build"
+cd apps/frontend
+bun run build
+cd ../..
 
-# ── Build (Frontend + Backend) ──────────────────────────────────────────────
-echo "==> Alte Build-Artefakte entfernen"
-rm -rf apps/frontend/dist apps/backend/dist
-
-echo "==> Build (alle Workspaces)"
-pnpm build
-
+# ── Backend Daemon neu starten ───────────────────────────────────────────────
+# pkill beendet den Bun-Prozess → Supervisor startet ihn automatisch neu
 export NODE_ENV=production
+echo "==> Backend: Bun-Prozess neu starten"
+pkill -f "apps/backend/src/index.ts" 2>/dev/null || true
+sleep 3
+
+# Prüfe ob Backend wieder läuft (Health Check muss ggf. noch in app/backend/src/index.ts rein)
+if curl -sf http://localhost:3005/api/example > /dev/null 2>&1; then
+  echo "    Backend erfolgreich neu gestartet"
+else
+  echo "    Backend noch nicht bereit, warte weitere 5s..."
+  sleep 5
+fi
 
 echo "============================================"
-echo "  Deploy fertig. PM2-Restart via Ploi."
+echo "  Deploy abgeschlossen."
 echo "============================================"

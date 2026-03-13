@@ -1,5 +1,4 @@
 import { logger } from "@ho-setup/logger";
-import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 
 import { errorHandler } from "./middleware/error-handler.js";
@@ -44,7 +43,7 @@ export type AppType = typeof routes;
 const port = parseInt(process.env.PORT || "3005", 10);
 logger.info(`Backend Starting on port ${port}...`);
 
-serve({
-  fetch: app.fetch,
+export default {
   port,
-});
+  fetch: app.fetch,
+};

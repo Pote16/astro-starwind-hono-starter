@@ -2,17 +2,17 @@
   "name": "astro-hono-setup",
   "private": true,
   "scripts": {
-    "dev": "pnpm -r --parallel run dev",
-    "dev:frontend": "pnpm --filter frontend run dev",
-    "dev:backend": "pnpm --filter backend run dev",
-    "build": "pnpm -r run build",
-    "lint": "pnpm -r run lint",
-    "lint:fix": "pnpm exec eslint apps/backend/src apps/frontend/src packages/db/src packages/logger/src --fix",
-    "outdated": "pnpm outdated -r",
-    "typecheck": "pnpm -r run typecheck",
-    "db:generate": "pnpm --filter @ho-setup/db run generate",
-    "db:push": "pnpm --filter @ho-setup/db run db:push",
-    "db:migrate": "pnpm --filter @ho-setup/db run db:migrate"
+    "dev": "bun --filter \"*\" run dev",
+    "dev:frontend": "bun --filter frontend run dev",
+    "dev:backend": "bun --filter backend run dev",
+    "build": "bun --filter \"*\" run build",
+    "lint": "bun --filter \"*\" run lint",
+    "lint:fix": "bunx eslint apps/backend/src apps/frontend/src packages/db/src packages/logger/src --fix",
+    "outdated": "bun pm outdated",
+    "typecheck": "bun --filter \"*\" run typecheck",
+    "db:generate": "bun --filter @ho-setup/db db:generate",
+    "db:push": "bun --filter @ho-setup/db db:push",
+    "db:migrate": "bun --filter @ho-setup/db db:migrate"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -25,8 +25,8 @@
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.56.1"
   },
-  "packageManager": "pnpm@10.30.3",
-  "engines": {
-    "node": ">=22"
-  }
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
 }
