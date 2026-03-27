@@ -8,7 +8,7 @@
     "build": "bun run --filter '*' build",
     "lint": "bun run --filter '*' lint",
     "lint:fix": "bunx eslint apps/backend/src apps/frontend/src packages/db/src packages/logger/src --fix",
-    "outdated": "bun outdated",
+    "outdated": "bun outdated --filter='*'",
     "typecheck": "bun run --filter '*' typecheck",
     "db:generate": "bun run --filter @ho-setup/db db:generate",
     "db:push": "bun run --filter @ho-setup/db db:push",
