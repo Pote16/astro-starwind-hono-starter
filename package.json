@@ -2,28 +2,28 @@
   "name": "astro-hono-setup",
   "private": true,
   "scripts": {
-    "dev": "bun --filter \"*\" run dev",
-    "dev:frontend": "bun --filter frontend run dev",
-    "dev:backend": "bun --filter backend run dev",
-    "build": "bun --filter \"*\" run build",
-    "lint": "bun --filter \"*\" run lint",
+    "dev": "bun run --filter '*' dev",
+    "dev:frontend": "bun run --filter frontend dev",
+    "dev:backend": "bun run --filter backend dev",
+    "build": "bun run --filter '*' build",
+    "lint": "bun run --filter '*' lint",
     "lint:fix": "bunx eslint apps/backend/src apps/frontend/src packages/db/src packages/logger/src --fix",
-    "outdated": "bun pm outdated",
-    "typecheck": "bun --filter \"*\" run typecheck",
-    "db:generate": "bun --filter @ho-setup/db db:generate",
-    "db:push": "bun --filter @ho-setup/db db:push",
-    "db:migrate": "bun --filter @ho-setup/db db:migrate"
+    "outdated": "bun outdated",
+    "typecheck": "bun run --filter '*' typecheck",
+    "db:generate": "bun run --filter @ho-setup/db db:generate",
+    "db:push": "bun run --filter @ho-setup/db db:push",
+    "db:migrate": "bun run --filter @ho-setup/db db:migrate"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "eslint": "^9.15.0",
+    "eslint": "^10.1.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-astro": "^1.6.0",
     "eslint-plugin-jsx-a11y": "^6.10.2",
     "eslint-plugin-simple-import-sort": "^12.1.1",
-    "globals": "^17.3.0",
-    "typescript": "^5.9.3",
-    "typescript-eslint": "^8.56.1"
+    "globals": "^17.4.0",
+    "typescript": "^6.0.2",
+    "typescript-eslint": "^8.57.2"
   },
   "workspaces": [
     "apps/*",

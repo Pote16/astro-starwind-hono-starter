@@ -25,7 +25,7 @@ alwaysApply: true
 - **Komponenten-Dokumentation:** Nutze `starwind_docs` mit dem `topic`-Parameter (z. B. `"button"`, `"dialog"`, `"accordion"`), um aktuelle API-Docs und Beispiele zu erhalten.
 - **Komponenten installieren:** Nutze `starwind_add` um den korrekten CLI-Befehl für die Installation zu generieren. Setze `pro: true` für Starwind Pro.
 - **Pro Blöcke suchen:** Nutze `search_starwind_pro_blocks` um vorgefertigte UI-Blöcke zu finden (Heroes, Footer, Pricing, Navigation etc.). Wir haben eine **Starwind Pro** Lizenz – Pro-Blöcke dürfen verwendet werden.
-- Installiere Komponenten immer via CLI (`pnpm dlx starwind@latest add <component>`), NIEMALS manuell kopieren.
+- Installiere Komponenten immer via CLI (`bunx starwind@latest add <component>`), NIEMALS manuell kopieren.
 
 4. **Astro MCP Server (`astro-mcp`):**
 

@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "starwind-ui": {
+      "command": "bunx",
+      "args": [
+        "@starwind-ui/mcp"
+      ],
+      "env": {}
+    },
+    "astro-docs": {
+      "type": "url",
+      "url": "https://mcp.docs.astro.build/mcp"
+    }
+  }
+}

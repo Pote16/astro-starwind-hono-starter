@@ -14,9 +14,9 @@ globs: "*"
 
 2. **Strikte Linter- und Typen-Prüfung:**
 
-- Nach jeder Code-Implementierung oder Datei-Änderung MUSST du einen Linter- und Type-Check im Terminal vorschlagen/ausführen (`pnpm run lint` oder `pnpm run typecheck`). Die IDE-Fehleranzeige reicht bei asynchronen Server-Actions oft nicht aus.
+- Nach jeder Code-Implementierung oder Datei-Änderung MUSST du einen Linter- und Type-Check im Terminal vorschlagen/ausführen (`bun run lint` oder `bun run typecheck`). Die IDE-Fehleranzeige reicht bei asynchronen Server-Actions oft nicht aus.
 - ES GIBT KEINE AUSNAHMEN FÜR `any` TYPEN. Alle Variablen, Parameter und Return-Werte müssen explizit typisiert sein.
-- Wenn der Linter Fehler wirft, behebe sie sofort autonom, bevor du den Task als erledigt markierst. Nutze dafür auch `--fix` (z.B. `pnpm exec eslint . --fix`).
+- Wenn der Linter Fehler wirft, behebe sie sofort autonom, bevor du den Task als erledigt markierst. Nutze dafür auch `--fix` (z.B. `bunx eslint . --fix`).
 
 3. **Keine überflüssigen Erklärungen:**
    Generiere den Code und den Validierungsbefehl. Keine langen Erklärungen von Standard-Syntax.
@@ -30,4 +30,5 @@ globs: "*"
 
 5. **Package Manager:**
 
-- Das Projekt nutzt `pnpm` als Package Manager. Verwende ausschließlich `pnpm` Befehle (kein `npm` oder `yarn`).
+- Das Projekt nutzt `bun` als Package Manager. Verwende ausschließlich `bun` Befehle (kein `npm`, `yarn` oder `pnpm`).
+- CLI-Tools werden mit `bunx` ausgeführt (nicht `npx` oder `pnpm dlx`).

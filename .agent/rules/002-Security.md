@@ -26,8 +26,8 @@ globs: "*"
 
 4. **SQL Injection & Datenbank-Sicherheit:**
 
-- Nutze ausschließlich den Prisma ORM Client für Datenbankabfragen. Bei unvermeidbarem Raw-SQL MUSS `$queryRaw` mit Template-Literals (automatisches Escaping) verwendet werden – NIEMALS String-Konkatenation.
-- Begrenze Abfrageergebnisse mit `take` / `LIMIT`, um DoS durch exzessive Datenmengen zu verhindern.
+- Nutze ausschließlich Drizzle ORM für Datenbankabfragen. Bei unvermeidbarem Raw-SQL MUSS parameterisiertes SQL verwendet werden – NIEMALS String-Konkatenation.
+- Begrenze Abfrageergebnisse mit `limit`, um DoS durch exzessive Datenmengen zu verhindern.
 
 5. **XSS-Prävention:**
 
