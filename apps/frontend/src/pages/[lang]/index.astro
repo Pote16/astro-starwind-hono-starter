@@ -1,5 +1,16 @@
 ---
-import { defaultLang, type Lang,languages } from "../../i18n/ui";
+import { Badge } from "@/components/starwind/badge";
+import { Button } from "@/components/starwind/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/starwind/card";
+
+import { defaultLang, type Lang, languages } from "../../i18n/ui";
 import Layout from "../../layouts/Layout.astro";
 
 export function getStaticPaths() {
@@ -8,25 +19,32 @@ export function getStaticPaths() {
     .filter((l) => l !== defaultLang)
     .map((l) => ({ params: { lang: l } }));
 }
-
-// const lang = getLangFromUrl(Astro.url);
 ---
 
 <Layout title="Astro Starwind Blank Starter">
-  <main class="min-h-screen bg-background flex flex-col items-center justify-center p-4">
-    <div class="max-w-3xl w-full rounded-2xl p-8 text-center space-y-6">
-      <h1 class="font-display text-4xl font-bold tracking-tight">
-        Astro + Starwind <span class="text-primary">Blank Starter</span>
-      </h1>
-      
-      <p class="text-muted-foreground text-lg text-center max-w-2xl mx-auto">
-        Your new blank canvas. Build something amazing.
-      </p>
-
-      <div class="mt-8 pt-6 border-t border-border flex justify-center gap-4 text-sm text-foreground">
-        <a href="/" class="hover:underline hover:text-primary transition-colors">DE</a>
-        <a href="/en" class="hover:underline hover:text-primary transition-colors">EN</a>
-      </div>
-    </div>
+  <main class="flex min-h-screen flex-col items-center justify-center bg-background p-4">
+    <Card class="w-full max-w-lg">
+      <CardHeader>
+        <div class="flex items-center gap-2">
+          <CardTitle>Astro + Starwind Starter</CardTitle>
+          <Badge variant="secondary">v2</Badge>
+        </div>
+        <CardDescription>
+          Your new blank canvas. Build something amazing.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <p class="text-muted-foreground">
+          Starwind UI 2 with Tailwind CSS v4, Hono API, and Drizzle ORM — all in
+          a Bun monorepo.
+        </p>
+      </CardContent>
+      <CardFooter class="flex flex-wrap gap-3">
+        <Button variant="primary" href="https://starwind.dev" target="_blank" rel="noreferrer">
+          Starwind Docs
+        </Button>
+        <Button variant="outline" href="/">Deutsch</Button>
+      </CardFooter>
+    </Card>
   </main>
 </Layout>

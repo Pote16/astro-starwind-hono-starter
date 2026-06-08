@@ -1,5 +1,6 @@
-import { drizzle } from "drizzle-orm/bun-sql";
 import { SQL } from "bun";
+import { drizzle } from "drizzle-orm/bun-sql";
+
 import * as schema from "./schema.js";
 
 // Verhindert Error beim Build, wenn die Umgebungsvariable noch nicht gesetzt ist

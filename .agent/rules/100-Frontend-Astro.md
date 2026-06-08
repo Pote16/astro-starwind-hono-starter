@@ -87,18 +87,18 @@ export const server = {
 
 ## Styling & UI
 
-10. **Starwind UI (Pro):**
+10. **Starwind UI v2 (Pro):**
 
-- Verwende Starwind UI als primäre Komponentenbibliothek. Wir haben eine **Pro-Lizenz** – Pro-Blöcke und Komponenten dürfen genutzt werden.
-- Komponenten liegen nach Installation unter `src/components/starwind/`. Importiere sie über den `@/`-Alias: `import { Button } from "@/components/starwind/button"`.
-- Bevor du eine UI-Komponente selber baust, prüfe über den Starwind UI MCP Server (`starwind_docs`), ob es die Komponente bereits gibt.
-- Für ganze Seitenblöcke (Hero, Pricing, FAQ etc.) prüfe die Pro-Blöcke über `search_starwind_pro_blocks`.
-- Passe Starwind-Komponenten NICHT direkt im `components/starwind/`-Ordner an – erstelle stattdessen Wrapper-Komponenten in `components/ui/` die Starwind nutzen.
+- Primäre Komponentenbibliothek mit **Pro-Lizenz**. Komponenten unter `src/components/starwind/` mit `variants.ts` (tailwind-variants, `data-slot`).
+- Import: `import { Button } from "@/components/starwind/button"`.
+- Skills: `.claude/skills/starwind-ui` + `starwind-pro`. CLI: `bunx starwind@latest add <component> --yes` (aus `apps/frontend/`).
+- Vor eigenem Bau: Skill + CLI `docs` (oder MCP `starwind_docs`). Pro-Blöcke: Skill `starwind-pro` + `search --plan pro`.
+- Starwind-Komponenten NICHT direkt anpassen – Wrapper in `components/ui/`.
 
 11. **Tailwind CSS v4:**
 
 - Nutze Tailwind CSS v4 mit der neuen `@theme`-Syntax und CSS-Variablen.
-- Theming erfolgt über die CSS-Variablen in `src/styles/starwind.css` (`:root` und `.dark`).
+- Theming über CSS-Variablen in `src/styles/global.css` (`:root` und `.dark`).
 - Verwende die semantischen Farben (`bg-primary`, `text-foreground`, `border-border`) statt hardgecodeter Tailwind-Farben (`bg-blue-700`).
 - Dark Mode wird über die CSS-Klasse `.dark` gesteuert – kein `prefers-color-scheme` Media-Query.
 

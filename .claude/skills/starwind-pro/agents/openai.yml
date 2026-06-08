@@ -1,0 +1,6 @@
+interface:
+  display_name: "Starwind Pro"
+  short_description: "Finds and adapts Starwind Pro blocks."
+  icon_small: "./assets/starwind-small.png"
+  icon_large: "./assets/starwind.png"
+  default_prompt: "Use $starwind-pro to find and install a Starwind Pro block for my Astro project."
