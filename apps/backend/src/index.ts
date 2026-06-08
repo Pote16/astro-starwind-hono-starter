@@ -11,6 +11,11 @@ import exampleRouter from "./routes/example.js";
 
 const app = new Hono();
 
+// Health check (vor Middleware – kein Rate-Limit/CSRF für Deploy-Probe)
+app.get("/health", (c) =>
+  c.json({ status: "ok", timestamp: new Date().toISOString() }),
+);
+
 // global error handler overrides default
 app.onError(errorHandler);
 
