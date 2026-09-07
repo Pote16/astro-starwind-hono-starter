@@ -8,6 +8,6 @@
     },
     "types": ["bun-types", "astro/client"]
   },
-  "include": [".astro/types.d.ts", "src/**/*", "astro.config.mjs"],
+  "include": [".astro/types.d.ts", "src/**/*", "tools/**/*", "astro.config.mjs"],
   "exclude": ["node_modules", "dist"]
 }

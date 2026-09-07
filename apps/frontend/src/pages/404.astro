@@ -7,8 +7,13 @@ import Layout from "@/layouts/Layout.astro";
 // und keine hreflang-Alternativen. Die Seite darf nicht indexiert werden.
 ---
 
-<Layout title="404 – Seite nicht gefunden | Page not found" noindex>
+<Layout
+  title="404 – Seite nicht gefunden | Page not found"
+  description="Die angeforderte Adresse existiert nicht oder wurde verschoben. The requested address does not exist or has moved."
+  noindex
+>
   <main
+    id="inhalt"
     class="flex min-h-screen flex-col items-center justify-center gap-6 bg-background px-4 py-10"
   >
     <section class="w-full max-w-lg space-y-3 text-center" lang="de">

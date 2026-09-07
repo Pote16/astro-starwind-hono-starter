@@ -1,4 +1,6 @@
 ---
+import ogDefault from "@/assets/og-default.png";
+import Bild from "@/components/Bild.astro";
 import DemoFormular from "@/components/DemoFormular.astro";
 import { Badge } from "@/components/starwind/badge";
 import { Button } from "@/components/starwind/button";
@@ -22,10 +24,19 @@ const translatePath = useTranslatedPath(lang);
 const otherLang: Lang = lang === "de" ? "en" : "de";
 ---
 
-<Layout title={t("starter.title")}>
+<Layout title={t("seo.title")} description={t("seo.description")}>
   <main
+    id="inhalt"
     class="flex min-h-screen flex-col items-center justify-center gap-6 bg-background px-4 py-10"
   >
+    {/* Das größte sichtbare Bild der Seite lädt mit priority; alle weiteren lazy. */}
+    <Bild
+      src={ogDefault}
+      alt={t("seo.heroAlt")}
+      priority
+      sizes="(max-width: 640px) calc(100vw - 2rem), 512px"
+      class="w-full max-w-lg rounded-xl border shadow-sm"
+    />
     <Card class="w-full max-w-lg">
       <CardHeader>
         <div class="flex flex-wrap items-center gap-2">
@@ -46,6 +57,7 @@ const otherLang: Lang = lang === "de" ? "en" : "de";
           href={translatePath("", otherLang)}
           lang={otherLang}
           hreflang={otherLang}
+          data-astro-prefetch="hover"
         >
           {languages[otherLang]}
         </Button>

@@ -1,0 +1,16 @@
+---
+/**
+ * Rendert ein schema.org-Objekt als JSON-LD-Script. Nur mit Build-Daten aus
+ * src/data/site.ts bzw. src/lib/schema.ts verwenden, nie mit Nutzereingaben.
+ */
+interface Props {
+  data: Record<string, unknown>;
+}
+
+const { data } = Astro.props;
+
+// "<" escapen: kein vorzeitiges </script> und kein Markup innerhalb des JSON.
+const json = JSON.stringify(data).replace(/</g, "\\u003c");
+---
+
+<script is:inline type="application/ld+json" set:html={json} />
