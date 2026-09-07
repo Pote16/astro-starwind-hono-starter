@@ -43,9 +43,10 @@ supervisor_pid() {
 if [ -n "$PLOI_DAEMON_NAME" ]; then
   # Nur ein konkreter Prozess, optional mit Gruppenpräfix. Supervisor versteht
   # "all" und Gruppen-Wildcards als mehrere Ziele; solche Angaben sind verboten.
-  [[ "$PLOI_DAEMON_NAME" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]*(:[A-Za-z0-9_][A-Za-z0-9_.-]*)?$ ]] \
-    && [ "${#PLOI_DAEMON_NAME}" -le 128 ] \
-    || starter_fehler "PLOI_DAEMON_NAME muss genau einen Supervisor-Prozess benennen."
+  if ! [[ "$PLOI_DAEMON_NAME" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]*(:[A-Za-z0-9_][A-Za-z0-9_.-]*)?$ ]] \
+    || ! [ "${#PLOI_DAEMON_NAME}" -le 128 ]; then
+    starter_fehler "PLOI_DAEMON_NAME muss genau einen Supervisor-Prozess benennen."
+  fi
   case "$PLOI_DAEMON_NAME" in
     [aA][lL][lL]|[aA][lL][lL]:*|*:[aA][lL][lL]) starter_fehler "PLOI_DAEMON_NAME darf kein Sammelziel enthalten." ;;
   esac

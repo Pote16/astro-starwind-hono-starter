@@ -63,6 +63,7 @@ starter_lock() {
 # Den Port pro abgeleitetem Projekt mit dem Nginx-Proxy abgleichen.
 starter_port() {
   export PORT="${PORT:-3005}"
-  [[ "$PORT" =~ ^[1-9][0-9]{0,4}$ ]] && [ "$PORT" -le 65535 ] \
-    || starter_fehler "PORT muss eine ganze Zahl zwischen 1 und 65535 sein."
+  if ! [[ "$PORT" =~ ^[1-9][0-9]{0,4}$ ]] || ! [ "$PORT" -le 65535 ]; then
+    starter_fehler "PORT muss eine ganze Zahl zwischen 1 und 65535 sein."
+  fi
 }
