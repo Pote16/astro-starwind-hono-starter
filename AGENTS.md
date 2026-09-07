@@ -37,8 +37,8 @@ in [README.md](README.md), Deployment in [scripts/README.md](scripts/README.md).
   ausschließlich die eigene Implementierung wiederholen.
 - Nach Änderungen die betroffenen Prüfungen ausführen. Vor Abschluss müssen die
   Root-Befehle `bun run lint`, `bun run typecheck`, `bun test`, `bun run build`,
-  `bun run format:check` und `bun run test:e2e` bestehen. Bei neuen Abhängigkeiten
-  zusätzlich `bun install --frozen-lockfile` prüfen.
+  `bun run audit:seo`, `bun run format:check` und `bun run test:e2e` bestehen. Bei
+  neuen Abhängigkeiten zusätzlich `bun install --frozen-lockfile` prüfen.
 - Browsertests verwenden simulierte Anbieterantworten und erfundene Testdaten.
   Keine echten Turnstile-, Mail- oder Tracking-Aufrufe im Testlauf. Die gleichen
   Gates gelten in CI, ohne Datenbank und ohne echte Anbieterzugangsdaten.
@@ -69,6 +69,23 @@ in [README.md](README.md), Deployment in [scripts/README.md](scripts/README.md).
 - Starwind-Komponenten unter `components/starwind/` sind generiert. Installation
   und Aktualisierung über die CLI; Anpassungen über Props/Klassen oder eigene
   Bausteine. Semantische Tailwind-Tokens aus `styles/global.css` verwenden.
+
+## SEO, strukturierte Daten und Bilder
+
+- `src/data/site.ts` ist die einzige Quelle für Fakten über Website und Betreiber
+  (Name, Origin aus `PUBLIC_SITE_URL`, Beschreibung je Sprache, Kontakt, Profile).
+  JSON-LD, Manifest, `robots.txt` und `llms.txt` lesen nur dort. Keine erfundenen
+  Adressen, Bewertungen, Preise oder Verfügbarkeiten; leere Felder bleiben leer und
+  werden in den strukturierten Daten weggelassen.
+- Jede Seite übergibt dem Layout `title` und `description`, je Seite und Sprache
+  eindeutig (`src/i18n/ui.ts`). Jede Seite existiert unter derselben Kennung in allen
+  Sprachen mit Endslash; Danke- und Fehlerseiten sind `noindex` bzw. stehen in
+  `NOINDEX_SEITEN` (`src/lib/seiten.ts`).
+- Bilder ausschließlich über `components/Bild.astro` aus `src/assets`; genau ein Bild
+  pro Seite trägt `priority`. `public/` nur für Icons und unveränderte Dateien.
+  Kein `ClientRouter`; Prefetch nur mit `data-astro-prefetch` auf Navigationslinks.
+- `bun run audit:seo` muss nach `bun run build` bestehen; dasselbe Gate läuft im Deploy
+  gegen `dist.new` und in CI. Regeln und Kennungen: [docs/seo.md](docs/seo.md).
 
 ## Backend, Datenbank und Umgebung
 

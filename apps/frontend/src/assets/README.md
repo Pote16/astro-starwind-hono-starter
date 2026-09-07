@@ -1,15 +1,46 @@
 # Assets (`src/assets`)
 
-Dieser Ordner enthält statische Assets, die von Astro importiert, verarbeitet oder gebündelt werden sollen.
+Dateien hier werden von Astro importiert und über `astro:assets` optimiert. Dateien
+in `public/` werden **nicht** optimiert; dorthin gehören nur Icons und Dateien, die
+unverändert unter ihrer URL erreichbar sein müssen (`favicon.*`, `apple-touch-icon.png`,
+`icon-*.png`). `robots.txt`, `site.webmanifest`, `llms.txt` und die Sitemap werden
+aus `src/pages/*.ts` bzw. der Sitemap-Integration erzeugt, nicht abgelegt.
 
-## Was gehört hier rein?
+## Bilder einbinden: `components/Bild.astro`
 
-- **Bilder:** Lokale Bilder (`.jpg`, `.png`, `.webp`, `.svg`), die auf deinen Seiten via `import` verwendet werden und von Astros Image-Optimization profitieren sollen (`<Image src={importImage} />`).
-- **Icons:** Spezifische statische Icons (als raw SVG oder verarbeitbare Files), die in Komponenten referenziert werden.
-- **Fonts:** Eigene Schriftarten (falls sie nicht über `@fontsource` geladen werden) und gebündelt werden sollen.
+```astro
+---
+import hero from "@/assets/hero.jpg";
+import Bild from "@/components/Bild.astro";
+---
 
-## Best Practices
+<Bild src={hero} alt="Beschreibung" priority sizes="(max-width: 640px) 100vw, 512px" />
+<Bild src={hero} alt="Beschreibung" class="rounded-xl" />
+```
 
-- Nutze `src/assets` für Dateien, auf die du im Code verweist und die "optimiert" werden dürfen/sollen.
-- Nutze den Ordner `public/` (im Root) NUR für Dateien, die unverändert (1:1 mit gleicher URL) im Browser aufrufbar sein müssen (z.B. `favicon.ico`, `robots.txt`, `sitemap.xml` oder PWA-Manifests).
-- Gliedere Assets ggf. in Unterordner: `src/assets/images`, `src/assets/icons`.
+- Ausgabe: `<picture>` mit AVIF und WebP-Rückfall (Qualität 62, entspricht etwa
+  WebP q80 bei 25–40 % weniger Bytes), `srcset`/`sizes` aus `image.layout: "constrained"`
+  (`astro.config.mjs`), feste `width`/`height` gegen Layoutsprünge.
+- `priority` genau einmal pro Seite für das größte sichtbare Bild beim Laden (LCP):
+  `loading="eager"`, `fetchpriority="high"`, `decoding="sync"`. Alle anderen Bilder
+  laden lazy. Das Build-Gate `bun run audit:seo` meldet mehr als ein Priority-Bild,
+  fehlende `alt`-Texte oder fehlende Maße.
+- `sizes` beschreibt die tatsächliche Darstellungsbreite; `widths` überschreibt die
+  automatischen Breiten nur bei Bedarf.
+- SVG-Grafiken, die als Bild eingebunden werden, bleiben unverändert (kein AVIF).
+
+## Vorschaubild `og-default.png`
+
+1200×630, erzeugt von `tools/erzeuge-icons.ts` (`bun run icons` in `apps/frontend`)
+aus `public/favicon.svg`; in `src/data/site.ts` als `defaultOgImage` referenziert und
+vom Layout als `og:image`/`twitter:image` ausgegeben. Eine Seite kann ein eigenes Bild
+über das Layout-Prop `image={{ src, alt }}` mitgeben; es wird zur Bauzeit auf 1200×630
+gebracht.
+
+## Schriften
+
+Inter kommt über die Astro-Fonts-API (`fonts` in `astro.config.mjs`, Provider
+Fontsource, nur `latin`, woff2) mit Preload im Layout; `--font-inter` speist
+`--font-sans` in `src/styles/global.css`. Eigene Schriftdateien gehören nach
+`src/assets/fonts/` und werden mit `fontProviders.local()` eingebunden; höchstens eine
+Schrift vorladen, sonst konkurriert der Preload mit dem LCP-Bild.

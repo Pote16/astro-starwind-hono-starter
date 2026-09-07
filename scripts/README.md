@@ -7,19 +7,19 @@ was im Ploi-Panel steht, wird hier gespiegelt und von Hand synchron gehalten.
 
 ## Dateien
 
-| Datei                | Aufgabe                                                                                                         |
-| -------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `ploi-autodeploy.sh` | Spiegel des Ploi-Deploy-Scripts: `git fetch`, `git reset --hard origin/main`, `bash scripts/deploy.sh`          |
-| `deploy.sh`          | Vorprüfungen, Lock, Install, Gates, Build nach `dist.new`, Audits, Migration, Veröffentlichung, Daemon-Neustart |
-| `deploy-common.sh`   | Root-`.env` laden (verlangt `NODE_ENV=production`), Bun-Pin, Port, Lock, Worker-ID, `supervisorctl`             |
-| `deploy-audits.sh`   | Build-Prüfungen gegen `dist.new` (Sprachindizes, `404.html`, `robots.txt`); Ort für projektspezifische Gates    |
-| `start-backend.sh`   | Optionaler Daemon-Wrapper mit Bun-Pin-Prüfung; Standard bleibt `bun run apps/backend/src/index.ts`              |
-| `cronjobs/run.sh`    | Einziger Cron-Einstieg: Allowlist, Umgebung, Lock je Job, setzt während eines Deploys aus                       |
-| `nginx.conf`         | Ploi-Vhost-Vorlage mit Platzhaltern `__DOMAIN__`, `__SITE_DIRECTORY__`, `__PORT__`, `__MAPPREFIX__`             |
-| `deploy.test.ts`     | Fixtures mit simuliertem bun/git/sudo/supervisorctl/curl (nur Linux, läuft in CI)                               |
-| `nginx.test.ts`      | Echte lokale Nginx-Instanz gegen die Vorlage (`STARTER_NGINX_BIN`)                                              |
-| `harness.test.ts`    | Vertragsprüfung: `.gitignore`, `.gitattributes`, keine Prozessmuster, Nginx-Regeln, `.env.example`              |
-| `rename.js`          | Projektnamen und Paket-Scope beim Ableiten ersetzen                                                             |
+| Datei                | Aufgabe                                                                                                                |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `ploi-autodeploy.sh` | Spiegel des Ploi-Deploy-Scripts: `git fetch`, `git reset --hard origin/main`, `bash scripts/deploy.sh`                 |
+| `deploy.sh`          | Vorprüfungen, Lock, Install, Gates, Build nach `dist.new`, Audits, Migration, Veröffentlichung, Daemon-Neustart        |
+| `deploy-common.sh`   | Root-`.env` laden (verlangt `NODE_ENV=production`), Bun-Pin, Port, Lock, Worker-ID, `supervisorctl`                    |
+| `deploy-audits.sh`   | Build-Prüfungen gegen `dist.new` (Sprachindizes, `404.html`, `robots.txt`, SEO-Gate); Ort für projektspezifische Gates |
+| `start-backend.sh`   | Optionaler Daemon-Wrapper mit Bun-Pin-Prüfung; Standard bleibt `bun run apps/backend/src/index.ts`                     |
+| `cronjobs/run.sh`    | Einziger Cron-Einstieg: Allowlist, Umgebung, Lock je Job, setzt während eines Deploys aus                              |
+| `nginx.conf`         | Ploi-Vhost-Vorlage mit Platzhaltern `__DOMAIN__`, `__SITE_DIRECTORY__`, `__PORT__`, `__MAPPREFIX__`                    |
+| `deploy.test.ts`     | Fixtures mit simuliertem bun/git/sudo/supervisorctl/curl (nur Linux, läuft in CI)                                      |
+| `nginx.test.ts`      | Echte lokale Nginx-Instanz gegen die Vorlage (`STARTER_NGINX_BIN`)                                                     |
+| `harness.test.ts`    | Vertragsprüfung: `.gitignore`, `.gitattributes`, keine Prozessmuster, Nginx-Regeln, `.env.example`                     |
+| `rename.js`          | Projektnamen und Paket-Scope beim Ableiten ersetzen                                                                    |
 
 ## Betriebsmodell
 
@@ -64,7 +64,9 @@ was im Ploi-Panel steht, wird hier gespiegelt und von Hand synchron gehalten.
    ersetzt sie). Ersten Deploy manuell auslösen und das Log lesen; danach den
    Push-Webhook aktivieren.
 9. Von außen prüfen: Startseite, `/en/`, `/health`, eine API-Route, `/robots.txt`,
-   `/sitemap-index.xml`, eine unbekannte URL (Status 404 mit eigener Seite).
+   `/sitemap-index.xml`, `/site.webmanifest`, `/llms.txt`, eine unbekannte URL
+   (Status 404 mit eigener Seite). Danach Sitemap in Google Search Console und Bing
+   Webmaster Tools eintragen ([docs/seo.md](../docs/seo.md)).
 
 Bei jeder späteren Neuanlage des Daemons vergibt Ploi eine neue ID; `PLOI_WORKER_ID`
 nachziehen.
@@ -81,7 +83,11 @@ nachziehen.
 4. `bun install --frozen-lockfile`, `validate-env.ts`, `bun run lint`,
    `bun run typecheck`, `bun test apps packages`. Formatprüfung und die
    Deploy-Fixtures laufen nur in CI.
-5. Astro nach `dist.new` bauen, `deploy-audits.sh` prüfen.
+5. Astro nach `dist.new` bauen, `deploy-audits.sh` prüfen: Sprachindizes, `404.html`,
+   `robots.txt` und das SEO-Gate `apps/frontend/tools/pruefe-seo.ts` (Canonical,
+   hreflang, Sitemap, Bilder, interne Links, JSON-LD; Bericht `.deploy/seo-audit.json`,
+   Regeln in [docs/seo.md](../docs/seo.md)). Die Build-Origin muss `PUBLIC_SITE_URL`
+   entsprechen.
 6. Zielcommit erneut prüfen, `bun run db:migrate` (nur versionierte Migrationen).
 7. `dist` → `dist.old`, `dist.new` → `dist`. Bei einem Fehler stellt der Exit-Handler
    `dist.old` wieder her.

@@ -90,6 +90,9 @@ laden die Root-Datei über `--env-file=../../.env`, Astro über `vite.envDir`.
 Produktionswrapper lesen dieselbe Datei als vertrauenswürdige Bash-Zuweisungen;
 Werte mit Leerzeichen oder Sonderzeichen entsprechend quotieren.
 
+- `PUBLIC_SITE_URL` ist die öffentliche HTTPS-Origin ohne Pfad. Astro leitet daraus
+  `site`, Canonical, hreflang, Sitemap, Open-Graph-URLs und `robots.txt` ab; ohne Wert
+  gilt `http://localhost:4321`, ein ungültiger Wert bricht den Build ab.
 - `FRONTEND_ORIGINS` enthält exakte, durch Kommas getrennte Origins ohne Pfad,
   Endslash oder Wildcard. In Produktion ist eine eigene Liste erforderlich.
 - `PUBLIC_API_URL` bleibt üblicherweise leer: Astro/Vite leitet `/api` lokal an
@@ -128,21 +131,31 @@ Konfiguration; projektfremde Rechtstexte oder echte Zugangsdaten sind nicht enth
 Die [Integrationsanleitung](docs/integrationen.md) beschreibt sämtliche Variablen,
 Aufrufbeispiele, Testmöglichkeiten und die Grenzen von Widerruf und Deduplizierung.
 
+## SEO, AI-Sichtbarkeit und PageSpeed
+
+Jede Seite liefert Titel und Description je Sprache, Canonical, hreflang mit
+`x-default`, Open Graph, Favicon-Satz, Manifest, JSON-LD (Organization, WebSite)
+und ein vorgeladenes Inter über die Astro-Fonts-API. Sitemap, `robots.txt`
+(Such- und Antwort-Bots ausdrücklich erlaubt) und `llms.txt` werden aus
+`apps/frontend/src/data/site.ts` erzeugt. `bun run audit:seo` prüft den Build ohne
+Browser und läuft im Deploy wie in CI. [Details, Regeln und Quellen](docs/seo.md)
+
 ## Befehle und Qualitätsprüfung
 
-| Befehl                 | Zweck                                                 |
-| ---------------------- | ----------------------------------------------------- |
-| `bun run dev`          | Frontend und Backend starten                          |
-| `bun run build`        | Statisches Frontend bauen, Backend-Typen prüfen       |
-| `bun run lint`         | Astro-Diagnostik und ESLint                           |
-| `bun run typecheck`    | Typprüfung aller Workspaces                           |
-| `bun test`             | Tests einschließlich lokaler Deploy-Fixtures          |
-| `bun run format`       | Prettier einschließlich Astro und Tailwind            |
-| `bun run format:check` | Formatierung prüfen                                   |
-| `bun run outdated`     | Paketversionen in allen Workspaces vergleichen        |
-| `bun run db:generate`  | Versionierte Migration erzeugen                       |
-| `bun run db:migrate`   | Vorhandene Migrationen anwenden                       |
-| `bun run db:push`      | Schema direkt abgleichen, nur bewusst lokal verwenden |
+| Befehl                 | Zweck                                                      |
+| ---------------------- | ---------------------------------------------------------- |
+| `bun run dev`          | Frontend und Backend starten                               |
+| `bun run build`        | Statisches Frontend bauen, Backend-Typen prüfen            |
+| `bun run audit:seo`    | SEO-Gate gegen den Build, Bericht `.deploy/seo-audit.json` |
+| `bun run lint`         | Astro-Diagnostik und ESLint                                |
+| `bun run typecheck`    | Typprüfung aller Workspaces                                |
+| `bun test`             | Tests einschließlich lokaler Deploy-Fixtures               |
+| `bun run format`       | Prettier einschließlich Astro und Tailwind                 |
+| `bun run format:check` | Formatierung prüfen                                        |
+| `bun run outdated`     | Paketversionen in allen Workspaces vergleichen             |
+| `bun run db:generate`  | Versionierte Migration erzeugen                            |
+| `bun run db:migrate`   | Vorhandene Migrationen anwenden                            |
+| `bun run db:push`      | Schema direkt abgleichen, nur bewusst lokal verwenden      |
 
 Vor einer Änderung zuerst den vorhandenen Zustand prüfen. Vor einem Commit müssen
 Lint, Typprüfung, Tests, Formatprüfung und Build erfolgreich sein. Generierte
@@ -154,8 +167,8 @@ nur die Typen mit `tsc --noEmit` und erzeugt kein eigenes `dist`-Verzeichnis.
 ## Test- und Agent-Harness
 
 GitHub prüft jeden Push auf `main` und jeden Pull Request mit den Jobs `Quality` und `Browser E2E`.
-Das Gate umfasst Frozen-Install, Lint, Typen, Formatierung, Build, Bun-Tests und
-reale Nginx-Routingtests. Isolierte Playwright-Tests bedienen die deutsche und
+Das Gate umfasst Frozen-Install, Lint, Typen, Formatierung, Build, Bun-Tests,
+reale Nginx-Routingtests und das SEO-Gate gegen den Produktionsbuild. Isolierte Playwright-Tests bedienen die deutsche und
 englische Oberfläche auf Desktop und Mobilgeräten. Sie prüfen Formularabläufe,
 Turnstile und Cookie-Zustände mit abgefangenen Anbieterrequests.
 
@@ -219,7 +232,8 @@ bun.lock             Geprüfter Paketstand
 `scripts/` ist der Referenz-Harness für alle Ploi-Sites: Push auf `main` → Ploi-Hook
 (`git reset --hard origin/main`) → `scripts/deploy.sh`. Der Deploy lädt die von Ploi
 geschriebene `.env` (Pflicht: `NODE_ENV=production`, `PLOI_WORKER_ID`), prüft Bun-Pin,
-Lint, Typen und Tests, baut nach `dist.new`, migriert, tauscht das Frontend und
+Lint, Typen und Tests, baut nach `dist.new`, prüft den Build mit dem SEO-Gate
+(`PUBLIC_SITE_URL` muss zur Build-Origin passen), migriert, tauscht das Frontend und
 startet ausschließlich den eigenen Supervisor-Daemon `worker-<id>` neu, mit
 Nachweis einer neuen PID und Health-Check. Die [Ploi-Anleitung](scripts/README.md)
 beschreibt Einrichtung, Ablauf und Grenzen; die Entscheidungen stehen im
