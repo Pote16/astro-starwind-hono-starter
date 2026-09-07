@@ -1,0 +1,59 @@
+---
+import DemoFormular from "@/components/DemoFormular.astro";
+import { Badge } from "@/components/starwind/badge";
+import { Button } from "@/components/starwind/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/starwind/card";
+import { formularUebersetzung } from "@/i18n/formular";
+import { type Lang, languages } from "@/i18n/ui";
+import { getLangFromLocale, useTranslatedPath, useTranslations } from "@/i18n/utils";
+import Layout from "@/layouts/Layout.astro";
+
+const lang = getLangFromLocale(Astro.currentLocale);
+const t = useTranslations(lang);
+const formularText = formularUebersetzung(lang);
+const translatePath = useTranslatedPath(lang);
+const otherLang: Lang = lang === "de" ? "en" : "de";
+---
+
+<Layout title={t("starter.title")}>
+  <main
+    class="flex min-h-screen flex-col items-center justify-center gap-6 bg-background px-4 py-10"
+  >
+    <Card class="w-full max-w-lg">
+      <CardHeader>
+        <div class="flex flex-wrap items-center gap-2">
+          <CardTitle><h1>{t("starter.title")}</h1></CardTitle>
+          <Badge variant="secondary">v3</Badge>
+        </div>
+        <CardDescription>{t("starter.description")}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <p class="text-muted-foreground">{t("starter.stack")}</p>
+      </CardContent>
+      <CardFooter class="flex flex-wrap gap-3">
+        <Button variant="primary" href="https://starwind.dev" target="_blank" rel="noreferrer">
+          {t("starter.docs")}
+        </Button>
+        <Button
+          variant="outline"
+          href={translatePath("", otherLang)}
+          lang={otherLang}
+          hreflang={otherLang}
+        >
+          {languages[otherLang]}
+        </Button>
+      </CardFooter>
+    </Card>
+    <DemoFormular />
+    <Button type="button" variant="outline" data-cookie-einstellungen class="min-h-11">
+      {formularText("cookies")}
+    </Button>
+  </main>
+</Layout>

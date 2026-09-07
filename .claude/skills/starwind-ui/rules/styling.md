@@ -72,9 +72,7 @@ Use component variants and sizes before overriding styles with utility classes.
 **Incorrect:**
 
 ```astro
-<Button class="border border-input bg-transparent text-foreground hover:bg-accent">
-  Cancel
-</Button>
+<Button class="border border-input bg-transparent text-foreground hover:bg-accent"> Cancel </Button>
 ```
 
 **Correct:**
@@ -166,17 +164,13 @@ Starwind dark mode is class-based through `.dark`, and component colors come fro
 **Incorrect:**
 
 ```astro
-<main class="bg-white text-slate-950 dark:bg-slate-950 dark:text-slate-50">
-  Content
-</main>
+<main class="bg-white text-slate-950 dark:bg-slate-950 dark:text-slate-50">Content</main>
 ```
 
 **Correct:**
 
 ```astro
-<main class="bg-background text-foreground">
-  Content
-</main>
+<main class="bg-background text-foreground">Content</main>
 ```
 
 For global theme changes, edit `:root` and `.dark` variables in the active Starwind CSS file.
@@ -191,6 +185,7 @@ For conditional or merged class names, follow Starwind's component pattern and u
 
 ```astro
 <div class={`flex items-center ${isActive ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
+</div>
 ```
 
 **Correct:**
@@ -213,7 +208,7 @@ export const item = tv({
 ```
 
 ```astro
-<div class={item({ active: isActive })}>
+<div class={item({ active: isActive })}></div>
 ```
 
 Use this for reusable variants or component internals. For one-off layout, a plain `class` string is fine.

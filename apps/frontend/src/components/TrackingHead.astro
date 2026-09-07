@@ -1,0 +1,39 @@
+---
+import { trackingKonfiguration } from "../lib/tracking-konfiguration";
+---
+
+{
+  (trackingKonfiguration.googleAnalytics || trackingKonfiguration.googleAds) && (
+    <script
+      is:inline
+      data-tracking="google-consent"
+      set:html={`
+      window.dataLayer = window.dataLayer || [];
+      window.gtag = window.gtag || function(){ window.dataLayer.push(arguments); };
+      window.gtag('consent', 'default', {
+        ad_storage: 'denied', ad_user_data: 'denied',
+        ad_personalization: 'denied', analytics_storage: 'denied'
+      });
+    `}
+    />
+  )
+}
+
+{
+  trackingKonfiguration.meta && (
+    <script
+      is:inline
+      data-tracking="meta-consent"
+      set:html={`
+      (function(w) {
+        if (w.fbq) return;
+        var q = w.fbq = function() {
+          q.callMethod ? q.callMethod.apply(q, arguments) : q.queue.push(arguments);
+        };
+        w._fbq = q; q.push = q; q.loaded = true; q.version = '2.0'; q.queue = [];
+        q('consent', 'revoke');
+      })(window);
+    `}
+    />
+  )
+}

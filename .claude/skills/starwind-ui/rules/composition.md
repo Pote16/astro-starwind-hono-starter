@@ -25,16 +25,16 @@ Compose Starwind UI from installed Astro components. Prefer documented parts and
 
 ## Use Components, Not Custom Markup
 
-| Instead of | Use |
-| --- | --- |
-| Custom callout `div` | `alert` |
-| Custom status pill/span | `badge` |
-| Raw `hr` or border-only divider | `separator` |
-| Custom loading pulse block | `skeleton` |
-| Inline spinner markup | `spinner` |
-| Hand-rolled toast stack | `toast` with one `Toaster` |
-| Generic bordered section | `card` or `item` when the structure matches |
-| Manually joined buttons | `button-group` |
+| Instead of                      | Use                                         |
+| ------------------------------- | ------------------------------------------- |
+| Custom callout `div`            | `alert`                                     |
+| Custom status pill/span         | `badge`                                     |
+| Raw `hr` or border-only divider | `separator`                                 |
+| Custom loading pulse block      | `skeleton`                                  |
+| Inline spinner markup           | `spinner`                                   |
+| Hand-rolled toast stack         | `toast` with one `Toaster`                  |
+| Generic bordered section        | `card` or `item` when the structure matches |
+| Manually joined buttons         | `button-group`                              |
 
 Starwind does not currently document a standalone `empty` component. For empty states, compose semantic app markup with `Card`, `Item`, `Button`, icons, and text.
 
@@ -42,13 +42,13 @@ Starwind does not currently document a standalone `empty` component. For empty s
 
 Use group wrappers when a component provides them.
 
-| Items | Group |
-| --- | --- |
-| `SelectItem`, `SelectLabel`, `SelectSeparator` | `SelectGroup` |
-| `Item` | `ItemGroup` |
-| `Button` clusters | `ButtonGroup` |
-| `InputOtpSlot` | `InputOtpGroup` |
-| `Kbd` combinations | `KbdGroup` |
+| Items                                          | Group           |
+| ---------------------------------------------- | --------------- |
+| `SelectItem`, `SelectLabel`, `SelectSeparator` | `SelectGroup`   |
+| `Item`                                         | `ItemGroup`     |
+| `Button` clusters                              | `ButtonGroup`   |
+| `InputOtpSlot`                                 | `InputOtpGroup` |
+| `Kbd` combinations                             | `KbdGroup`      |
 
 For Dropdown and Context Menu grouping, labels, shortcuts, checkboxes, and submenus, confirm exact names from current docs or local exports.
 
@@ -91,18 +91,18 @@ Useful APIs: `toast()`, `toast.success()`, `toast.error()`, `toast.warning()`, `
 
 ## Choosing Between Overlay Components
 
-| Use case | Component |
-| --- | --- |
-| Focused modal task that requires input | `dialog` |
-| Destructive or irreversible confirmation | `alert-dialog` |
-| Side panel with details, filters, or navigation | `sheet` |
-| Mobile-first bottom panel | `sheet` with `SheetContent side="bottom"` |
-| Menu of actions from a button | `dropdown` |
-| Right-click or long-press menu | `context-menu` |
-| Small contextual content opened by click | `popover` |
-| Rich preview on hover | `hover-card` |
-| Short helper text on hover/focus | `tooltip` |
-| Choosing from a list of values | `select` or `native-select` |
+| Use case                                        | Component                                 |
+| ----------------------------------------------- | ----------------------------------------- |
+| Focused modal task that requires input          | `dialog`                                  |
+| Destructive or irreversible confirmation        | `alert-dialog`                            |
+| Side panel with details, filters, or navigation | `sheet`                                   |
+| Mobile-first bottom panel                       | `sheet` with `SheetContent side="bottom"` |
+| Menu of actions from a button                   | `dropdown`                                |
+| Right-click or long-press menu                  | `context-menu`                            |
+| Small contextual content opened by click        | `popover`                                 |
+| Rich preview on hover                           | `hover-card`                              |
+| Short helper text on hover/focus                | `tooltip`                                 |
+| Choosing from a list of values                  | `select` or `native-select`               |
 
 A tooltip is not an interactive panel, a popover is not a destructive confirmation, and a dropdown is not a form select.
 

@@ -4,17 +4,19 @@ import { Hono } from "hono";
 import { errorHandler } from "./middleware/error-handler.js";
 // Import Middlewares
 import { loggerMiddleware } from "./middleware/logger.js";
-import { rateLimitMiddleware } from "./middleware/rate-limit.js";
-import { corsMiddleware,csrfMiddleware, secureHeadersMiddleware } from "./middleware/security.js";
+import { createRateLimitMiddleware } from "./middleware/rate-limit.js";
+import { createSecurityMiddleware, secureHeadersMiddleware } from "./middleware/security.js";
 // Import Routes
-import exampleRouter from "./routes/example.js";
+import { createExampleRouter } from "./routes/example.js";
+import { loadBackendEnvironment } from "./schemas/backend-env.schema.js";
 
+const environment = loadBackendEnvironment();
+const rateLimitMiddleware = createRateLimitMiddleware(environment);
+const { corsMiddleware, csrfMiddleware } = createSecurityMiddleware(environment);
 const app = new Hono();
 
 // Health check (vor Middleware – kein Rate-Limit/CSRF für Deploy-Probe)
-app.get("/health", (c) =>
-  c.json({ status: "ok", timestamp: new Date().toISOString() }),
-);
+app.get("/health", (c) => c.json({ status: "ok", timestamp: new Date().toISOString() }));
 
 // global error handler overrides default
 app.onError(errorHandler);
@@ -39,16 +41,18 @@ app.use("*", csrfMiddleware);
 // --- Mount Routes ---
 // RPC Types werden aus den routern generiert
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-const routes = app.route("/api", exampleRouter);
+const routes = app.route("/api", createExampleRouter(environment));
 
 // Export RPC AppType for Frontend consumption
 export type AppType = typeof routes;
 
 // --- Start Server ---
-const port = parseInt(process.env.PORT || "3005", 10);
+const port = environment.port;
 logger.info(`Backend Starting on port ${port}...`);
 
 export default {
+  // Nur der lokale Reverse-Proxy darf den oeffentlichen API-Zugang vermitteln.
+  hostname: "127.0.0.1",
   port,
   fetch: app.fetch,
 };

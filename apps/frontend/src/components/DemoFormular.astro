@@ -1,0 +1,70 @@
+---
+import BotSchutz from "@/components/BotSchutz.astro";
+import { Button } from "@/components/starwind/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/starwind/card";
+import { Input } from "@/components/starwind/input";
+import { Label } from "@/components/starwind/label";
+import { formularUebersetzung } from "@/i18n/formular";
+import { getLangFromLocale } from "@/i18n/utils";
+
+const language = getLangFromLocale(Astro.currentLocale);
+const t = formularUebersetzung(language);
+---
+
+<Card class="w-full max-w-lg">
+  <CardHeader>
+    <CardTitle><h2>{t("titel")}</h2></CardTitle>
+    <CardDescription id="demo-hinweis">{t("hinweis")}</CardDescription>
+  </CardHeader>
+  <CardContent>
+    <form
+      method="post"
+      action="/api/users"
+      data-demo-form
+      data-language={language}
+      aria-describedby="demo-hinweis"
+      class="space-y-5"
+    >
+      <div class="space-y-2">
+        <Label for="demo-name">{t("name")}</Label>
+        <Input
+          id="demo-name"
+          name="name"
+          required
+          minlength="2"
+          maxlength="120"
+          autocomplete="off"
+        />
+      </div>
+      <div class="space-y-2">
+        <Label for="demo-email">{t("email")}</Label>
+        <Input
+          id="demo-email"
+          name="email"
+          type="email"
+          required
+          maxlength="254"
+          autocomplete="off"
+        />
+      </div>
+      <div class="hidden" aria-hidden="true">
+        <Label for="demo-website">Website</Label>
+        <Input id="demo-website" name="website" tabindex="-1" autocomplete="off" />
+      </div>
+      <BotSchutz action="create_user" />
+      <Button type="submit" class="min-h-11" disabled>{t("senden")}</Button>
+      <p data-form-status role="status" aria-live="polite" class="text-sm leading-relaxed" hidden>
+      </p>
+      <noscript><p class="text-sm">{t("javascript")}</p></noscript>
+    </form>
+  </CardContent>
+</Card>
+<script>
+  import "../scripts/demo-formular";
+</script>

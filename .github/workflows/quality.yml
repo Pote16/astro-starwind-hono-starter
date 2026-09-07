@@ -1,0 +1,124 @@
+name: Quality
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: "true"
+  ASTRO_TELEMETRY_DISABLED: "1"
+
+jobs:
+  quality:
+    name: Quality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Bun aus Projekt-Pin installieren
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
+      - name: Runtime-Pin prüfen
+        run: test "$(bun --version)" = "$(tr -d '\r\n' < .bun-version)"
+
+      - name: Abhängigkeiten unverändert installieren
+        timeout-minutes: 5
+        run: bun install --frozen-lockfile
+
+      - name: Lokale Infrastrukturprüfungen vorbereiten
+        timeout-minutes: 5
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends nginx shellcheck
+
+      - name: Shellskripte prüfen
+        run: |
+          for script in scripts/*.sh; do bash -n "$script"; done
+          shellcheck scripts/*.sh
+
+      - name: Lint
+        timeout-minutes: 5
+        run: bun run lint
+
+      - name: Typen prüfen
+        timeout-minutes: 5
+        run: bun run typecheck
+
+      - name: Tests einschließlich Nginx und Deploy-Fixtures
+        timeout-minutes: 5
+        env:
+          STARTER_NGINX_BIN: /usr/sbin/nginx
+        run: bun test
+
+      - name: Formatierung prüfen
+        timeout-minutes: 3
+        run: bun run format:check
+
+      - name: Produktionsbuild ohne Datenbank oder Anbieterkeys
+        timeout-minutes: 5
+        run: bun run build
+
+  browser:
+    name: Browser E2E
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Bun aus Projekt-Pin installieren
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
+      - name: Runtime-Pin prüfen
+        run: test "$(bun --version)" = "$(tr -d '\r\n' < .bun-version)"
+
+      - name: Abhängigkeiten unverändert installieren
+        timeout-minutes: 5
+        run: bun install --frozen-lockfile
+
+      # Nur der Playwright-Testprozess nutzt Node; die Testserver laufen mit Bun.
+      - name: Node 22 für den Playwright-Runner installieren
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+          package-manager-cache: false
+
+      - name: Chromium und Betriebssystembibliotheken installieren
+        timeout-minutes: 5
+        run: bunx playwright install --with-deps chromium
+
+      - name: Browserabläufe prüfen
+        timeout-minutes: 5
+        run: bun run test:e2e
+
+      # Ausschließlich Berichte der lokalen Demo mit erfundenen Testdaten.
+      - name: Fehlerartefakte sichern
+        if: ${{ failure() && !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: browser-failure
+          path: |
+            test-results/
+            playwright-report/
+          include-hidden-files: false
+          if-no-files-found: ignore
+          retention-days: 7

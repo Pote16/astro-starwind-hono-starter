@@ -1,0 +1,16 @@
+node_modules/
+dist/
+dist.new/
+dist.old/
+.deploy/
+.astro/
+build/
+bun.lock
+apps/frontend/src/components/starwind/
+packages/db/drizzle/
+
+# Lokale Playwright-Ergebnisse
+test-results/
+playwright-report/
+blob-report/
+.cache/e2e/

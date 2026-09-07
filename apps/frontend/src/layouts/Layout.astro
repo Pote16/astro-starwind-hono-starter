@@ -2,28 +2,30 @@
 import "../styles/global.css";
 import "vanilla-cookieconsent/dist/cookieconsent.css";
 
+import TrackingHead from "../components/TrackingHead.astro";
+import { getLangFromLocale } from "../i18n/utils";
+
 interface Props {
   title: string;
 }
 
 const { title } = Astro.props;
+const lang = getLangFromLocale(Astro.currentLocale);
 ---
 
 <!doctype html>
-<html lang="de">
+<html lang={lang}>
   <head>
     <meta charset="UTF-8" />
-    <meta
-      name="description"
-      content="Astro + Starwind + Hono Starter Project"
-    />
+    <meta name="description" content="Astro + Starwind + Hono Starter Project" />
     <meta name="viewport" content="width=device-width" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="generator" content={Astro.generator} />
     <title>{title}</title>
+    <TrackingHead />
     <slot name="head" />
   </head>
-  <body class="antialiased min-h-screen">
+  <body class="min-h-screen antialiased">
     <slot />
     <script>
       import "../scripts/cookie-consent";

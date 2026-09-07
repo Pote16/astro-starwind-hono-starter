@@ -4,6 +4,9 @@ node_modules/
 
 # Build outputs
 dist/
+dist.new/
+dist.old/
+.deploy/
 .astro/
 .output/
 build/
@@ -32,13 +35,14 @@ coverage/
 .nyc_output/
 *.lcov
 
-# Prisma (generierter Client wird via pnpm db:generate erzeugt)
-packages/db/src/generated/
-packages/db/prisma/migrations/**/migration_lock.toml
-
 # Starwind Pro (Lizenzschlüssel in .env.local)
 apps/frontend/.env.local
 
 # Misc
 .cache/
 .turbo/
+
+# Lokale Playwright-Ergebnisse
+test-results/
+playwright-report/
+blob-report/

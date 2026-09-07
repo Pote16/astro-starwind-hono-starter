@@ -1,15 +1,19 @@
-# Database Package (@ho-setup/db)
+# Datenbankpaket `@ho-setup/db`
 
-Dieser Ordner kapselt den Prisma ORM Client und das Datenbankschema.
-Dadurch wird sichergestellt, dass Frontend und Backend auf dieselben generierten Typen und Datenbankverbindungen zugreifen können.
+Drizzle ORM auf PostgreSQL; der Runtime-Client in `src/index.ts` verwendet Bun SQL.
+Schema: `src/schema.ts`. Versionierte SQL-Migrationen: `drizzle/`.
+Drizzle-Kit-Konfiguration: `drizzle.config.ts`.
 
-## Struktur
+Die Apps importieren `db` und Tabellen über `@ho-setup/db`. Der Modulimport stellt
+keine Datenbankverbindung her; Abfragen dürfen weder Frontend-Build noch Backendstart
+vorausgesetzt werden. Die aktuelle API-Demo speichert nichts.
 
-- `prisma/`: Enthält die `schema.prisma` und Migrationen.
-- `src/`: Exportiert den konfigurierten Prisma-Client (`index.ts`).
+Diese Befehle aus dem **Projektroot** ausführen:
 
-## Befehle
+- `bun run db:generate`: Migration aus Schemaänderungen erzeugen.
+- `bun run db:migrate`: vorhandene Migrationen anwenden; benötigt PostgreSQL.
+- `bun run db:push`: bewusstes direktes Schemaabgleichen für lokale Entwicklung;
+  kann Daten verändern und gehört nicht in den Produktionsdeploy.
 
-- `pnpm db:generate`: Generiert den Prisma Client.
-- `pnpm db:push`: Pusht Schema-Änderungen in die DB.
-- `pnpm db:migrate`: Erstellt und wendet Migrationen an.
+Einrichtung: [Root-README](../../README.md). Bestehende Docker-Volumes:
+[PostgreSQL 18](../../docs/postgresql-18.md). Projektregeln: [AGENTS.md](../../AGENTS.md).

@@ -1,19 +1,10 @@
 ---
 trigger: glob
-description: Globale Logging Regeln im Monorepo
-globs: ["**/*.ts", "**/*.astro", "**/*.tsx"]
+description: "Verweis auf die kanonischen Projektregeln: Logging"
+globs: "**/*.{ts,astro,tsx,js}"
 ---
 
-# Antigravity Logging Rules
+# Logging
 
-Diese Regeln verbieten standardmäßige Console Logs.
-
-## 1. Verbot von Console.log
-
-- Nutze NIEMALS `console.log`, `console.error`, `console.warn` in deinem Code (weder Frontend noch Backend).
-
-## 2. Pino Logger
-
-- Jegliches Logging muss über das interne Package `@hollyhub/logger` (Pino) geschehen.
-- Logge Fehler immer als vollständiges Objekt (`logger.error(error, "Custom message")`), um den Stack-Trace intakt zu lassen.
-- Logge User-Aktionen als strukturiertes JSON (`logger.info({ userId, action }, "Aktion ausgeführt")`).
+Lies vor der Arbeit die [kanonischen Projektregeln](../../AGENTS.md).
+Diese Datei enthält keine zusätzlichen oder abweichenden Regeln.

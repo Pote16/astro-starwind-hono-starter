@@ -4,15 +4,15 @@ services:
     container_name: ho-setup-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: db_user
-      POSTGRES_PASSWORD: db_password
-      POSTGRES_DB: db_name
+      POSTGRES_USER: ${POSTGRES_USER:-db_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-db_password}
+      POSTGRES_DB: ${POSTGRES_DB:-db_name}
     ports:
-      - "5435:5432"
+      - "127.0.0.1:5435:5432"
     volumes:
-      - ho_setup_pgdata:/var/lib/postgresql/data
+      - ho_setup_pgdata:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U db_user -d db_name"]
+      test: ["CMD-SHELL", 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
       interval: 5s
       timeout: 5s
       retries: 5

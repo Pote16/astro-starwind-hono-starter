@@ -1,34 +1,8 @@
 ---
-description: Kernregeln für jeden generierten Code, Validierung und Linter-Checks
-globs: "*"
-alwaysApply: true
+description: "Verweis auf die kanonischen Projektregeln: Workflow und Qualitätsgate"
 ---
 
-# Workflow & Qualitätskontrolle
+# Workflow und Qualitätsgate
 
-1. **Nachfragen vor Annahmen (Ask First):**
-   Wenn Anforderungen, Architektur-Entscheidungen oder Business-Logiken nicht zu 100 % klar sind, darfst du KEINEN Code generieren.
-
-- Kommentiere im Chat exakt, was unklar ist.
-- Liste die Fragen auf, die der Entwickler zuerst klären muss (z. B. "Wie genau soll die Stripe-Webhook-Signatur hier validiert werden?").
-
-2. **Strikte Linter- und Typen-Prüfung:**
-
-- Nach jeder Code-Implementierung oder Datei-Änderung MUSST du einen Linter- und Type-Check im Terminal vorschlagen/ausführen (`bun run lint` oder `bun run typecheck`). Die IDE-Fehleranzeige reicht bei asynchronen Server-Actions oft nicht aus.
-- ES GIBT KEINE AUSNAHMEN FÜR `any` TYPEN. Alle Variablen, Parameter und Return-Werte müssen explizit typisiert sein.
-- Wenn der Linter Fehler wirft, behebe sie sofort autonom, bevor du den Task als erledigt markierst. Nutze dafür auch `--fix` (z.B. `bunx eslint . --fix`).
-
-3. **Keine überflüssigen Erklärungen:**
-   Generiere den Code und den Validierungsbefehl. Keine langen Erklärungen von Standard-Syntax.
-
-4. **Zod-Validierung ist Pflicht:**
-
-- Jede Funktion, die externe Daten entgegennimmt (User-Input, API-Responses, Webhooks, URL-Parameter, FormData), MUSS mit einem Zod-Schema validiert werden.
-- Verwende `.parse()` für synchrone und `.parseAsync()` für asynchrone Validierung – NIEMALS unkontrolliertes Casting mit `as`.
-- Zod-Schemas gehören in dedizierte Schema-Dateien (z. B. `schemas/booking.schema.ts`) und werden von dort importiert. Keine Inline-Schemas in Handlern.
-- Leite TypeScript-Typen aus Zod-Schemas ab (`z.infer<typeof MySchema>`), um doppelte Typ-Definitionen zu vermeiden.
-
-5. **Package Manager:**
-
-- Das Projekt nutzt `bun` als Package Manager. Verwende ausschließlich `bun` Befehle (kein `npm`, `yarn` oder `pnpm`).
-- CLI-Tools werden mit `bunx` ausgeführt (nicht `npx` oder `pnpm dlx`).
+Lies vor der Arbeit die [kanonischen Projektregeln](../../AGENTS.md).
+Diese Datei enthält keine zusätzlichen oder abweichenden Regeln.

@@ -1,50 +1,10 @@
 ---
-description: Pflicht zur Nutzung der MCP Server für aktuelle Dokumentation
-globs: "*"
+description: "Verweis auf die kanonischen Projektregeln: Aktuelle Dokumentation und Werkzeuge"
+globs: "**/*"
 alwaysApply: true
 ---
 
-# MCP Server Nutzung
+# Aktuelle Dokumentation und Werkzeuge
 
-1. **Dokumentation über MCP Server beziehen:**
-
-- Bevor du Code für Astro, Starwind UI, Hono, Zod, Drizzle oder andere Bibliotheken generierst, MUSST du die aktuellste Dokumentation über die verfügbaren MCP Server abrufen.
-- Verlasse dich NICHT auf dein Trainings-Wissen für API-Syntax oder Konfigurationen – die MCP Server liefern immer die aktuellste Version.
-- **Fallback:** Sollte ein MCP-Server (z.B. Context7) ausfallen oder Timeout-Fehler werfen, nutze als Fallback explizit Web-Search-Tools (falls verfügbar) für die offizielle Doku der Technologie (Stand 2026).
-
-2. **Context7 MCP Server (`plugin-context7-plugin-context7`):**
-
-- Nutze `resolve-library-id` um die korrekte Library-ID zu ermitteln, gefolgt von `query-docs` mit einer präzisen Frage.
-- Verwende Context7 für: Astro, Zod, Hono, Drizzle, Tailwind CSS, Nanostores, Stripe und alle weiteren Pakete.
-
-3. **Starwind UI – Skill (primär) + MCP (komplementär) + CLI v2:**
-
-- **Primärquelle in Claude Code: der projektlokale Skill** unter `.claude/skills/starwind-ui` und `.claude/skills/starwind-pro`. Aktualisieren: `bunx skills@latest add starwind-ui/skills --copy -y -a claude-code`.
-- **MCP (komplementär):** `@starwind-ui/mcp` bietet `starwind_docs`, `starwind_add`, `search_starwind_pro_blocks`. Wir haben eine **Starwind Pro** Lizenz.
-- **CLI v2** aus `apps/frontend/`, Runner = **bun**:
-  - `bunx starwind@latest search <query> [--plan free|pro]`
-  - `bunx starwind@latest docs <component> --json`
-  - `bunx starwind@latest add <component> --yes`
-  - `bunx starwind@latest setup` (Pro)
-- ⚠️ `init` schlägt in Bun-Monorepos fehl – stattdessen `setup` + CSS + `add`.
-- ⚠️ `update` überschreibt lokale Komponenten-Änderungen.
-- Stand: Starwind **v2** (`variants.ts`, `data-slot`, `tailwind-variants`).
-
-4. **Astro Docs / Astro MCP:**
-
-- `astro-docs`: offizielle Astro-Dokumentation.
-- `astro-mcp`: Laufzeit-Infos via Dev-Server (`http://localhost:4321/__mcp/sse`).
-
-5. **Wann welchen MCP Server nutzen:**
-
-| Frage / Aufgabe                            | MCP Server                                 |
-| ------------------------------------------ | ------------------------------------------ |
-| Astro-Syntax, Actions, Routing, SSR        | Context7 / Astro Docs                      |
-| Zod-Schema-Validierung                     | Context7 (`/colinhacks/zod`)               |
-| Hono-Routen, Middleware, RPC               | Context7 (`/honojs/website`)               |
-| Drizzle-Queries, Schema-Design             | Context7                                   |
-| Starwind UI Komponenten-API / Komposition  | Skill `starwind-ui` + CLI `docs`            |
-| Starwind UI Installation                   | CLI `add` / MCP `starwind_add`             |
-| Fertige UI-Blöcke (Hero, Pricing etc.)     | Skill `starwind-pro` + CLI `search --plan` |
-| Astro-Projekt Routen/Seiten (zur Laufzeit) | Astro MCP                                  |
-| Alle anderen Pakete                         | Context7                                   |
+Lies vor der Arbeit die [kanonischen Projektregeln](../../AGENTS.md).
+Diese Datei enthält keine zusätzlichen oder abweichenden Regeln.

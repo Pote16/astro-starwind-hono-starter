@@ -1,15 +1,18 @@
-# Internationalisierung (`src/i18n`)
+# Internationalisierung
 
-Dieser Ordner kapselt alle Texte, Übersetzungs-Wörterbücher und Hilfsfunktionen für die Mehrsprachigkeit (i18n) im Frontend.
+Astro-i18n definiert Deutsch unter `/` und Englisch unter `/en/` mit
+`prefixDefaultLocale: false`. `src/pages/[lang]/index.astro` erzeugt die zusätzliche
+Sprache über `getStaticPaths()`; beide Routen verwenden gemeinsames Seiten-Markup.
+Keine automatische Weiterleitung anhand der Browsersprache.
 
-## Was gehört hier rein?
+- `ui.ts`: Sprachen, Standardsprache und gemeinsame UI-Texte.
+- `formular.ts`: DE-/EN-Texte für Demoformular und Turnstile-Zustände.
+- `cookieConsent.ts`: Consent-Texte und sicher konfigurierte Datenschutzlinks.
+- `utils.ts`: typisierte Sprach-/Texthelfer und Pfade über Astros
+  `getRelativeLocaleUrl`. In Astro-Komponenten `Astro.currentLocale` verwenden.
 
-- **`ui.ts`**: Enthält die definierten Sprachen (`defaultLang`, `languages`) und das zentrale Dictionary-Objekt `ui` mit Keys für UI-Texte.
-- **`utils.ts`**: Hilfsfunktionen wie `getLangFromUrl()` (um die Sprache aus dem Pfad zu lesen) und `useTranslations()` (um typisiert auf die Keys zuzugreifen).
-- **JSON-Dateien (Optional):** Bei sehr großen Projekten können Übersetzungen auch in JSON-Dateien (`de.json`, `en.json`) oder Content Collections liegen. Hier im Starter verwenden wir primär Code-basierte Dictionaries für maximale Typensicherheit.
+Neue sichtbare Texte in beiden Sprachen pflegen. Lange Seiteninhalte bei Bedarf in
+strukturierte Datenmodule auslagern; identisches Markup nicht pro Sprache kopieren.
+Rechtstexte und Linkziele projektspezifisch klären, keine Platzhalter als Tatsachen ausgeben.
 
-## Best Practices
-
-- Nutze das `t('key')` Pattern in deinen Astro- und React-Komponenten.
-- Vermeide harte Fallbacks oder hartcodierte deutsche Texte in Komponenten (`<h1>Willkommen</h1>`). Alles sollte über die Language-Keys abrufbar sein (`<h1>{t('home.welcome')}</h1>`).
-- Halte die Keys ordentlich gruppiert (z.B. `nav.home`, `auth.login`, `footer.imprint`).
+[Frontend-README](../../README.md) · [Projektregeln](../../../../AGENTS.md)

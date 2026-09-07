@@ -15,6 +15,9 @@ export default [
       "**/.pnpm/**",
       "**/*Demo.astro",
       "**/components/starwind/**",
+      "**/dist.new/**",
+      "**/dist.old/**",
+      "**/.deploy/**",
     ],
   },
   js.configs.recommended,
@@ -27,7 +30,7 @@ export default [
     },
   },
   {
-    files: ["**/*.ts", "**/*.tsx"],
+    files: ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.mjs"],
     languageOptions: {
       parserOptions: {
         ecmaVersion: "latest",
@@ -42,11 +45,11 @@ export default [
       "@typescript-eslint/no-unused-vars": [
         "error",
         {
-          "argsIgnorePattern": "^_",
-          "varsIgnorePattern": "^_",
-          "caughtErrorsIgnorePattern": "^_"
-        }
-      ]
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+        },
+      ],
     },
   },
   ...eslintPluginAstro.configs.recommended,
@@ -62,8 +65,6 @@ export default [
       },
     },
   },
-  ...(Array.isArray(eslintPluginAstro.configs["flat/jsx-a11y-recommended"])
-    ? eslintPluginAstro.configs["flat/jsx-a11y-recommended"]
-    : []),
+  ...eslintPluginAstro.configs["jsx-a11y-recommended"],
   eslintConfigPrettier,
 ];

@@ -1,0 +1,3 @@
+[test]
+# Playwright hat einen eigenen Runner und eigene Lebenszyklen.
+pathIgnorePatterns = ["e2e/**"]

@@ -14,7 +14,7 @@ export const errorHandler: ErrorHandler = (err, c) => {
 
   // Unexpected errors
   logger.error(err, "Unhandled exception intercepted");
-  
+
   // Defense in depth: Return generic message to client
   return c.json(
     {
@@ -22,6 +22,6 @@ export const errorHandler: ErrorHandler = (err, c) => {
       error: "Internal Server Error",
       referenceId: c.req.header("x-request-id") || Date.now().toString(),
     },
-    500
+    500,
   );
 };

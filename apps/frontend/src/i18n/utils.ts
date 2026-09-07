@@ -1,20 +1,28 @@
-import { defaultLang,ui } from './ui';
+import { getRelativeLocaleUrl } from "astro:i18n";
 
-export function getLangFromUrl(url: URL) {
-  const [, lang] = url.pathname.split('/');
-  if (lang in ui) return lang as keyof typeof ui;
-  return defaultLang;
+import { defaultLang, type Lang, languages, ui } from "./ui";
+
+export function isLang(value: string | undefined): value is Lang {
+  return value !== undefined && Object.hasOwn(languages, value);
 }
 
-export function useTranslations(lang: keyof typeof ui) {
-  return function t(key: keyof typeof ui[typeof defaultLang]) {
-    // Return translation if exists, otherwise fallback to default string
-    return ui[lang]?.[key] || ui[defaultLang][key];
-  }
+export function getLangFromLocale(locale: string | undefined): Lang {
+  return isLang(locale) ? locale : defaultLang;
 }
 
-export function useTranslatedPath(lang: keyof typeof ui) {
-  return function translatePath(path: string, l: string = lang) {
-    return !path.startsWith(`/${l}`) ? `/${l}${path}`.replace(/\/$/, '') : path;
-  }
+export function getLangFromUrl(url: URL): Lang {
+  return getLangFromLocale(url.pathname.split("/")[1]);
+}
+
+export function useTranslations(lang: Lang) {
+  return function t(key: keyof (typeof ui)[typeof defaultLang]): string {
+    return ui[lang][key];
+  };
+}
+
+export function useTranslatedPath(lang: Lang) {
+  return function translatePath(path: string, target: Lang = lang): string {
+    // Astro berücksichtigt dabei auch den präfixlosen deutschen Standardpfad.
+    return getRelativeLocaleUrl(target, path.replace(/^\/+/, ""));
+  };
 }

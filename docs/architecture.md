@@ -1,30 +1,30 @@
-# Systemarchitektur & Entscheidungen
+# Architektur
 
-## Übersicht
+Der Starter ist ein Bun-Monorepo mit einem statischen Astro-Frontend, einer separaten
+Hono-API und zwei gemeinsamen Paketen. Versionen, Einrichtung und Qualitätsgate
+stehen in [README.md](../README.md); verbindliche Regeln in [AGENTS.md](../AGENTS.md).
 
-Dieses Template ist ein Monorepo: Frontend (Astro), Backend (Hono), geteilte Packages (DB, Logger).
+| Bereich   | Tatsächlicher Aufbau                                                 |
+| --------- | -------------------------------------------------------------------- |
+| Frontend  | Astro 7 SSG, Vite, Tailwind 4, Starwind UI 3; kein SSR-Adapter       |
+| API       | Hono auf Bun, lokal gebundener HTTP-Prozess                          |
+| Datenbank | Drizzle ORM mit PostgreSQL über Bun SQL, gekapselt in `@ho-setup/db` |
+| Logging   | Pino über `@ho-setup/logger`, keine personenbezogenen Requestdaten   |
+| Sprachen  | Native Astro-i18n-Routen `/` und `/en/`, gemeinsames Template        |
 
-## Technologie-Stack
+Astro erzeugt HTML zur Build-Zeit. Client-Scripts ergänzen Formular-, Consent- und
+Turnstile-Verhalten. Das Formular sendet JSON an `/api/users`; der Dev-Proxy und die
+Nginx-Vorlage leiten den Pfad zur Hono-API. Es gibt keine Build-Abfrage an API oder DB.
+`AppType` ist exportiert, aber derzeit kein Hono-RPC-Client angebunden.
 
-| Bereich   | Technologie         | Begründung                                         |
-| --------- | ------------------- | -------------------------------------------------- |
-| Monorepo  | pnpm Workspaces     | Goldstandard 2026, native Prisma-Unterstützung     |
-| Frontend  | Astro + Starwind UI | Zero-JS-Baseline, Tailwind v4, KI-freundlich (MCP) |
-| Backend   | Hono                | Edge/Node, typisiertes RPC, schlank                |
-| Datenbank | PostgreSQL + Prisma | packages/db als isoliertes Package                 |
-| Logging   | Pino                | packages/logger, strukturierte JSON-Logs           |
+Die Demo bestätigt ausschließlich validierte Testeingaben. Persistierung,
+Benutzerkonten, Authentifizierung und Webhooks sind nicht implementiert. Mail- und
+Tracking-Helfer stehen für spätere serverseitige Integration bereit und werden von
+der Demo nicht aufgerufen. Anbieter benötigen passende Konfiguration; Tracking
+zusätzlich aktuell gültige Einwilligung.
 
-## Verzeichnisstruktur
+Bun startet Backend-TypeScript direkt, deshalb emittiert der Backend-Build keine
+JavaScript-Kopien. Dev, Build, Health und Qualitätsprüfungen laufen ohne Datenbank
+und echte Anbieterzugangsdaten. Browsertests simulieren externe Anbieter.
 
-- `apps/frontend` – Astro (Port 4321)
-- `apps/backend` – Hono API & Webhooks (z. B. Stripe)
-- `packages/db` – Prisma Client, Schema
-- `packages/logger` – Pino-Instanz
-- `docs/` – Zentrale Doku (u. a. für Cursor-Kontext)
-
-## Architektur-Entscheidungen
-
-1. **Zero-JavaScript-Baseline (Astro):** Kein Client-JS außer expliziten Islands (`client:load`, `client:visible`).
-2. **Typisiertes RPC (Hono):** `AppType` wird exportiert, Frontend nutzt strikt typisierte API-Clients.
-3. **Singleton DB/Logger:** Keine eigenen Prisma-/Logger-Instanzen in Apps; Import aus `@ho-setup/db` bzw. `@ho-setup/logger`.
-4. **Starwind UI:** Native Astro-Komponenten, kein React-Overhead für statische Teile; optional MCP-Server für Cursor.
+[Deploymentvorlagen](../scripts/README.md) aktivieren keinen Dienst automatisch.
