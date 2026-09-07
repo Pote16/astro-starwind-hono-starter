@@ -54,16 +54,24 @@ starter_umgebung() {
 
 # Exakter Bun-Pin aus .bun-version. Bun selbst erzwingt weder .bun-version noch
 # packageManager; diese Prüfung ist auf dem Server der einzige Mechanismus.
-# Auf dem gemeinsamen Host gilt: alle Sites auf denselben Stand heben oder pro
-# Site BUN_INSTALL auf eine eigene Runtime zeigen lassen.
+#
+# Auf dem gemeinsamen Host liegt je Version eine eigene Runtime:
+#   /home/ploi/.bun-versions/<version>/bin/bun
+# Jede Site zeigt über BUN_INSTALL in ihrer Ploi-Environment auf die Version,
+# die zu ihrer .bun-version passt. Dadurch hebt ein Upgrade nur diese eine Site,
+# nicht alle gleichzeitig. starter_umgebung stellt BUN_INSTALL/bin voran, damit
+# auch verschachtelte Aufrufe (ein package.json-Script, das erneut "bun" ruft)
+# dieselbe Version erben; ohne das entscheidet der PATH des Kindprozesses.
+# Details und die Ploi-Masken: scripts/ploi-daemon.md.
 starter_runtime() {
-  local erwartet aktuell
+  local erwartet aktuell pfad
   [ -s "$ROOT_DIR/.bun-version" ] || starter_fehler ".bun-version fehlt oder ist leer."
   erwartet="$(tr -d '[:space:]' < "$ROOT_DIR/.bun-version")"
   [[ "$erwartet" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || starter_fehler "Ungültiger Bun-Pin in .bun-version."
-  aktuell="$(bun --version 2>/dev/null | tr -d '[:space:]')" || starter_fehler "Bun ist nicht verfügbar (BUN_INSTALL=$BUN_INSTALL)."
+  aktuell="$(bun --version 2>/dev/null | tr -d '[:space:]')" || starter_fehler "Bun ist nicht verfügbar (BUN_INSTALL=$BUN_INSTALL erwartet bin/bun darin)."
+  pfad="$(command -v bun)"
   [ "$aktuell" = "$erwartet" ] \
-    || starter_fehler "Bun $erwartet erforderlich, gefunden: $aktuell. Auf dem Server als ploi 'bun upgrade' ausführen (alle Sites auf denselben Pin) oder BUN_INSTALL auf eine passende Runtime setzen."
+    || starter_fehler "Bun $erwartet erforderlich, gefunden $aktuell aus $pfad. In der Ploi-Environment BUN_INSTALL=/home/ploi/.bun-versions/$erwartet setzen (dort muss bin/bun liegen) und denselben Pfad im Daemon-Kommando verwenden; kein globales Upgrade auf dem gemeinsamen Host."
 }
 
 # Exklusiver Deploy-Lock. Cronjobs halten denselben Lock geteilt (flock -s -n)

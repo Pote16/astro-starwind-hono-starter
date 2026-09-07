@@ -19,6 +19,7 @@ was im Ploi-Panel steht, wird hier gespiegelt und von Hand synchron gehalten.
 | `deploy.test.ts`     | Fixtures mit simuliertem bun/git/sudo/supervisorctl/curl (nur Linux, läuft in CI)                                      |
 | `nginx.test.ts`      | Echte lokale Nginx-Instanz gegen die Vorlage (`STARTER_NGINX_BIN`)                                                     |
 | `harness.test.ts`    | Vertragsprüfung: `.gitignore`, `.gitattributes`, keine Prozessmuster, Nginx-Regeln, `.env.example`                     |
+| `ploi-daemon.md`     | Spiegel der Ploi-Masken: Daemon-Kommando, Bun-Runtime je Version, Worker-ID                                            |
 | `rename.js`          | Projektnamen und Paket-Scope beim Ableiten ersetzen                                                                    |
 
 ## Betriebsmodell
@@ -37,9 +38,12 @@ was im Ploi-Panel steht, wird hier gespiegelt und von Hand synchron gehalten.
   laufen (eine fremde ID fällt vor jeder Änderung auf). Prozessmuster (`pkill`, `pgrep`)
   sind verboten: alle Sites starten dieselbe Kommandozeile.
 - **Runtime.** `.bun-version` ist der exakte Pin; Bun erzwingt ihn nicht selbst.
-  Der Server hat eine gemeinsame Installation unter `/home/ploi/.bun`. Alle Sites
-  auf denselben Stand heben (`bun upgrade` als `ploi`, danach alle Pins) oder pro
-  Site `BUN_INSTALL` auf eine eigene Runtime setzen.
+  Auf dem Server liegt je Version eine eigene Installation
+  (`/home/ploi/.bun-versions/<version>/bin/bun`), und jede Site zeigt über
+  `BUN_INSTALL` in ihrer Ploi-Environment auf die passende. Dadurch hebt ein
+  Upgrade nur diese eine Site statt alle gleichzeitig. Derselbe Pfad gehört ins
+  Daemon-Kommando. Kein globales `bun upgrade`.
+  Alle Masken und der Umstellungsweg: [ploi-daemon.md](ploi-daemon.md).
 - **Nginx.** Vorlage `nginx.conf` mit ersetzten Platzhaltern 1:1 in
   `Site → Manage → Edit Nginx Configuration`; `Web directory` der Site muss
   `/apps/frontend/dist` sein. Kein `add_header` in Locations (sonst verlieren HTML-

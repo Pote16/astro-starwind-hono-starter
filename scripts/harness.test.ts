@@ -95,6 +95,21 @@ describe("Deploy-Harness-Vertrag", () => {
     );
   });
 
+  test("Bun-Runtime ist je Site gepinnt und im Daemon-Spiegel dokumentiert", async () => {
+    const daemon = await datei("ploi-daemon.md");
+    expect(daemon).toContain("/home/ploi/.bun-versions/");
+    expect(daemon).toContain("bin/bun");
+    expect(daemon).toContain("PLOI_WORKER_ID");
+    expect(daemon).toMatch(/Processes\s*\*{0,2}\s*\|?\s*`?1`?/);
+    // Ein globales Upgrade würde alle Sites des Servers gleichzeitig umstellen.
+    for (const name of ["deploy.sh", "deploy-common.sh", "start-backend.sh", "cronjobs/run.sh"]) {
+      expect(await datei(name), name).not.toMatch(/^[^#\n]*\bbun upgrade\b/m);
+    }
+    const common = await datei("deploy-common.sh");
+    expect(common).toContain('export PATH="$BUN_INSTALL/bin:$PATH"');
+    expect(await datei("../.env.example")).toContain("BUN_INSTALL=/home/ploi/.bun-versions/");
+  });
+
   test("Frontend liefert eine 404-Seite, robots.txt und CI prüft alle Shellskripte", async () => {
     await expect(datei("../apps/frontend/src/pages/404.astro")).resolves.toContain("noindex");
     const workflow = await datei("../.github/workflows/quality.yml");

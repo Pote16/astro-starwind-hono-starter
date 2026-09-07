@@ -161,6 +161,11 @@ in [README.md](README.md), Deployment in [scripts/README.md](scripts/README.md).
   prüft diesen Vertrag; `.gitignore` muss `/ploi-*.sh` behalten.
 - `NODE_ENV=production` gehört in die Ploi-Environment (`.env`), nie als Export in
   ein Skript: Deploy, Cronjobs und Daemon lesen dieselbe Datei.
+- Die Bun-Version ist pro Projekt gepinnt (`.bun-version`, `packageManager`,
+  `bun-types`). Auf dem Server zeigt `BUN_INSTALL` je Site auf
+  `/home/ploi/.bun-versions/<version>`; derselbe Pfad steht im Daemon-Kommando.
+  Kein globales `bun upgrade`, damit Sites einzeln gehoben werden können.
+  Masken und Ablauf: [scripts/ploi-daemon.md](scripts/ploi-daemon.md).
 - Gates vor Migration, `dist.new`-Wechsel und Health-Abnahme mit neuer PID sind
   Pflicht. Der Verzeichniswechsel ist nicht vollständig atomar; kein automatischer
   DB-/Gesamtrelease-Rollback behaupten. Nginx wird vom Deploy nicht neu geladen.
