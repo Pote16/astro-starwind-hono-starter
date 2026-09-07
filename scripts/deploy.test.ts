@@ -112,6 +112,11 @@ if [ "$*" = "run build --outDir dist.new" ]; then
   printf 'robots' > dist.new/robots.txt
   [ "\${FIXTURE_NO_404:-0}" = 1 ] || printf '404' > dist.new/404.html
 fi
+if [[ "$*" == apps/frontend/tools/pruefe-seo.ts* ]]; then
+  # Das SEO-Gate liest nur den neuen Build; ohne dist.new/index.html schlägt es fehl.
+  [ -s "\${@: -1}/index.html" ] || exit 25
+  printf '{"erfolgreich":true}\\n' > "$FIXTURE_ROOT/.deploy/seo-audit.json"
+fi
 if [ "$*" = "run apps/backend/src/index.ts" ]; then
   printf 'daemon %s %s %s\\n' "$PWD" "$NODE_ENV" "$CI" >> "$FIXTURE_ROOT/aufrufe"
 fi
@@ -379,6 +384,7 @@ describe.skipIf(!linux)("deploy.sh", () => {
       { FIXTURE_FAIL: "run typecheck" },
       { FIXTURE_FAIL: "test apps packages" },
       { FIXTURE_FAIL: "run build" },
+      { FIXTURE_FAIL: "pruefe-seo" },
       { FIXTURE_NO_404: "1" },
       { FIXTURE_HEAD_DRIFT: "1" },
     ]) {
@@ -426,6 +432,7 @@ describe.skipIf(!linux)("deploy.sh", () => {
         "bun run typecheck",
         "bun test apps packages",
         "bun run build --outDir dist.new",
+        "bun apps/frontend/tools/pruefe-seo.ts --dist",
         "bun run db:migrate",
         "sudo -n /usr/bin/supervisorctl stop worker-123:*",
         "sudo -n /usr/bin/supervisorctl start worker-123:*",
@@ -442,6 +449,9 @@ describe.skipIf(!linux)("deploy.sh", () => {
       expect(await text(join(f.root, "apps/frontend/dist.old/index.html"))).toBe("bisherig");
       expect(await text(join(f.root, ".deploy/last-built-sha"))).toBe(`${sha}\n`);
       expect(r.ausgabe).toContain("PID 4712");
+      // Das SEO-Gate lief gegen dist.new und hinterließ seinen Bericht.
+      expect(r.aufrufe).toContain(`pruefe-seo.ts --dist ${f.root}/apps/frontend/dist.new`);
+      expect(await text(join(f.root, ".deploy/seo-audit.json"))).toContain('"erfolgreich":true');
       // Der optionale Daemon-Wrapper startet mit derselben geprüften Umgebung.
       const daemon = await f.run("start-backend.sh");
       expect(daemon.code, daemon.ausgabe).toBe(0);

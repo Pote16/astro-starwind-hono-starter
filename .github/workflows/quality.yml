@@ -59,8 +59,8 @@ jobs:
         timeout-minutes: 5
         run: bun run typecheck
 
-      - name: Tests einschließlich Nginx und Deploy-Fixtures
-        timeout-minutes: 5
+      - name: Tests einschließlich Nginx, Deploy-Fixtures und SEO-Gate
+        timeout-minutes: 8
         env:
           STARTER_NGINX_BIN: /usr/sbin/nginx
         run: bun test
@@ -72,6 +72,11 @@ jobs:
       - name: Produktionsbuild ohne Datenbank oder Anbieterkeys
         timeout-minutes: 5
         run: bun run build
+
+      # Dasselbe Gate wie im Deploy (scripts/deploy-audits.sh), gegen den CI-Build.
+      - name: SEO-Audit gegen den Produktionsbuild
+        timeout-minutes: 2
+        run: bun run audit:seo
 
   browser:
     name: Browser E2E

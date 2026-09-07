@@ -6,6 +6,7 @@
     "dev:frontend": "bun --bun run --filter frontend dev",
     "dev:backend": "bun --bun run --filter backend dev",
     "build": "bun --bun run --filter '*' build",
+    "audit:seo": "bun apps/frontend/tools/pruefe-seo.ts",
     "lint": "bun --bun run --filter '*' lint && bun --bun eslint e2e playwright.config.ts",
     "lint:fix": "bunx --bun eslint apps/backend/src apps/frontend/src packages/db/src packages/logger/src --fix",
     "outdated": "bun outdated --filter '*'",

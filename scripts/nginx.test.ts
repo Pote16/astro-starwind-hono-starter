@@ -58,6 +58,9 @@ test.skipIf(!nginx)(
         "en/index.html": "English",
         "404.html": "Seite nicht gefunden",
         "robots.txt": "User-agent: *\nAllow: /\n",
+        "sitemap-index.xml": "<sitemapindex/>",
+        "site.webmanifest": "{}",
+        "llms.txt": "# Test",
         "_astro/app.123.css": "body {}",
         "logo.svg": "<svg></svg>",
         ".secret": "vertraulich",
@@ -94,7 +97,7 @@ test.skipIf(!nginx)(
       const config = join(verzeichnis, "nginx.conf");
       await writeFile(
         config,
-        `daemon off;\nmaster_process off;\nerror_log ${verzeichnis}/error.log error;\npid ${verzeichnis}/nginx.pid;\nevents {}\nhttp {\n${tempPfade}\ntypes { text/html html; text/css css; image/svg+xml svg; text/plain txt; application/xml xml; }\n${lokal}\n}`,
+        `daemon off;\nmaster_process off;\nerror_log ${verzeichnis}/error.log error;\npid ${verzeichnis}/nginx.pid;\nevents {}\nhttp {\n${tempPfade}\ntypes { text/html html; text/css css; image/svg+xml svg; text/plain txt; application/xml xml; application/manifest+json webmanifest; }\n${lokal}\n}`,
       );
       const syntax = Bun.spawn(
         [nginx, "-e", join(verzeichnis, "error.log"), "-t", "-p", `${verzeichnis}/`, "-c", config],
@@ -162,6 +165,18 @@ test.skipIf(!nginx)(
       const robots = await fetch(ursprung + "/robots.txt");
       expect(robots.status).toBe(200);
       erwarteSicherheitsHeader(robots, "/robots.txt");
+      // Generierte Textrouten (src/pages/*.ts): erreichbar, passender Content-Type, kurz gecacht.
+      for (const [pfad, typ] of [
+        ["/sitemap-index.xml", "application/xml"],
+        ["/site.webmanifest", "application/manifest+json"],
+        ["/llms.txt", "text/plain"],
+      ] as const) {
+        const antwort = await fetch(ursprung + pfad);
+        expect(antwort.status, pfad).toBe(200);
+        expect(antwort.headers.get("content-type"), pfad).toStartWith(typ);
+        expect(antwort.headers.get("cache-control"), pfad).toBe("max-age=3600");
+        erwarteSicherheitsHeader(antwort, pfad);
+      }
       expect((await fetch(ursprung + "/favicon.ico")).status).toBe(404);
 
       // Echte 404-Seite aus dem Build mit Status 404, Headern und no-store.
