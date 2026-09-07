@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
-# Vorbereiteter Starter-Deploy für Linux/Ploi. Führt selbst kein git pull aus.
-# Der Ploi-Hook und manuelle Aufrufe halten denselben Lock bis zum Abschluss.
+# Produktionsdeploy für Linux/Ploi. Führt selbst kein git fetch/reset aus:
+# der Ploi-Hook (scripts/ploi-autodeploy.sh) setzt den Checkout vorher auf
+# origin/main und ruft dieses Skript auf. Ein manueller Aufruf aus dem
+# Site-Verzeichnis veröffentlicht den bereits ausgecheckten Commit.
+#
+# Ablauf: Umgebung/Runtime/Worker prüfen -> Lock -> Install -> Gates ->
+# Frontend nach dist.new bauen -> Build-Audits -> Migration -> dist tauschen ->
+# eigenen Ploi-Daemon neu starten -> neue PID + Health -> Erfolgsmarker.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
@@ -9,57 +15,68 @@ readonly ROOT_DIR
 cd "$ROOT_DIR"
 # shellcheck source=scripts/deploy-common.sh
 source "$SCRIPT_DIR/deploy-common.sh"
+
 starter_umgebung
 starter_runtime
 [ "${RESET_DB:-false}" = "false" ] || starter_fehler "RESET_DB ist im Produktionsdeploy verboten. Ausschließlich versionierte Migrationen verwenden."
 starter_port
 [ -n "${DATABASE_URL:-}" ] || starter_fehler "DATABASE_URL fehlt; keine Migration mit lokalen Datenbank-Defaults."
+starter_worker
 starter_lock
 
-NICHT_VERSIONIERTE_DATEIEN="$(git ls-files --others --exclude-standard)" \
-  || starter_fehler "Unversionierte Checkout-Dateien konnten nicht geprüft werden."
-if ! git diff --quiet || ! git diff --cached --quiet || [ -n "$NICHT_VERSIONIERTE_DATEIEN" ]; then
-  starter_fehler "Lokale Änderungen im Server-Checkout müssen vor dem Deploy geprüft werden."
+# Versionierte Abweichungen würden bedeuten, dass nicht der gemeldete Commit
+# ausgeliefert wird. Unversionierte Dateien im Site-Root (Plois eigenes
+# ploi-<hash>.sh, Logs) sind erlaubt und werden nur gelistet; unversionierte
+# Quelldateien dagegen würden von Astro/Bun mitgebaut und brechen ab.
+VERSIONIERT_GEAENDERT="$(git status --porcelain --untracked-files=no)" \
+  || starter_fehler "Git-Status des Server-Checkouts konnte nicht geprüft werden."
+if [ -n "$VERSIONIERT_GEAENDERT" ]; then
+  printf '%s\n' "$VERSIONIERT_GEAENDERT" | sed 's/^/  /' >&2
+  starter_fehler "Versionierte Dateien im Server-Checkout weichen ab. Sichern oder mit 'git reset --hard origin/main' verwerfen."
 fi
+UNVERSIONIERTE_QUELLEN="$(git ls-files --others --exclude-standard -- apps packages scripts)" \
+  || starter_fehler "Unversionierte Quelldateien konnten nicht geprüft werden."
+if [ -n "$UNVERSIONIERTE_QUELLEN" ]; then
+  printf '%s\n' "$UNVERSIONIERTE_QUELLEN" | sed 's/^/  /' >&2
+  starter_fehler "Unversionierte Quelldateien würden mitgebaut. Committen oder entfernen."
+fi
+UNVERSIONIERT="$(git ls-files --others --exclude-standard)" || true
+[ -z "$UNVERSIONIERT" ] || starter_hinweis "Unversionierte Dateien im Checkout (werden nicht ausgeliefert): $(printf '%s' "$UNVERSIONIERT" | tr '\n' ' ')"
+
 ZIEL_SHA="$(git rev-parse 'HEAD^{commit}')"
 HEALTH_URL="http://127.0.0.1:${PORT}/health"
 FRONTEND="$ROOT_DIR/apps/frontend"
 PHASE="pruefung"
 readonly ZIEL_SHA HEALTH_URL FRONTEND
 
-PLOI_DAEMON_NAME="${PLOI_DAEMON_NAME:-}"
-readonly PLOI_DAEMON_NAME
-ALTE_SUPERVISOR_PID=""
-NEUE_SUPERVISOR_PID=""
-
-supervisor_pid() {
-  local pid
-  pid="$(sudo -n /usr/bin/supervisorctl pid "$PLOI_DAEMON_NAME" 2>/dev/null)" || return 1
-  [[ "$pid" =~ ^[1-9][0-9]*$ ]] || return 1
-  [ "$(readlink -f "/proc/$pid/cwd" 2>/dev/null || true)" = "$ROOT_DIR" ] || return 1
-  printf '%s\n' "$pid"
+# Der Zielcommit darf sich während des Deploys nicht ändern. Der reale Ploi-Hook
+# läuft mit git reset --hard außerhalb dieses Locks; ein zweiter Hook könnte den
+# Checkout umschalten. Vor jeder irreversiblen Änderung wird HEAD erneut geprüft.
+git_head_pruefen() {
+  [ "$(git rev-parse 'HEAD^{commit}')" = "$ZIEL_SHA" ] \
+    || starter_fehler "Checkout wurde während des Deploys verändert (paralleler Hook?). Erneut deployen."
 }
 
-if [ -n "$PLOI_DAEMON_NAME" ]; then
-  # Nur ein konkreter Prozess, optional mit Gruppenpräfix. Supervisor versteht
-  # "all" und Gruppen-Wildcards als mehrere Ziele; solche Angaben sind verboten.
-  if ! [[ "$PLOI_DAEMON_NAME" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]*(:[A-Za-z0-9_][A-Za-z0-9_.-]*)?$ ]] \
-    || ! [ "${#PLOI_DAEMON_NAME}" -le 128 ]; then
-    starter_fehler "PLOI_DAEMON_NAME muss genau einen Supervisor-Prozess benennen."
-  fi
-  case "$PLOI_DAEMON_NAME" in
-    [aA][lL][lL]|[aA][lL][lL]:*|*:[aA][lL][lL]) starter_fehler "PLOI_DAEMON_NAME darf kein Sammelziel enthalten." ;;
-  esac
-  # Rechte, Existenz und Projektzugehörigkeit müssen vor jeder Installation,
-  # Migration oder Veröffentlichung feststehen. Ein leerer/gestoppter Daemon
-  # wird zuerst in Ploi eingerichtet, nicht still auf einen anderen Weg umgestellt.
-  ALTE_SUPERVISOR_PID="$(supervisor_pid)" \
-    || starter_fehler "Konfigurierter Ploi-Daemon ist nicht laufend, gehört nicht zu diesem Projekt oder seine gezielte sudo-pid-Freigabe fehlt."
-  # pid-Leserecht allein beweist keine Restart-Berechtigung. -l prüft die
-  # Freigabe ohne Ausführung, damit sie nicht erst nach dem Publish fehlt.
-  sudo -n -l /usr/bin/supervisorctl restart "$PLOI_DAEMON_NAME" >/dev/null 2>&1 \
-    || starter_fehler "Gezielte sudo-restart-Freigabe für den konfigurierten Ploi-Daemon fehlt."
-fi
+# Kindprozesse erhalten den Lock-Deskriptor nicht; ein hängender Build-Worker
+# darf den nächsten Deploy nicht blockieren.
+run() { "$@" 9>&-; }
+
+# Der Worker muss vor jeder Installation feststehen: Supervisor kennt das
+# Programm, und laufende Prozesse gehören zu genau diesem Site-Verzeichnis.
+# Eine fremde Worker-ID würde hier auffallen, bevor irgendetwas neu startet.
+worker_pids_pruefen() {
+  local pid
+  for pid in $1; do
+    [ "$(readlink -f "/proc/$pid/cwd" 2>/dev/null || true)" = "$ROOT_DIR" ] \
+      || starter_fehler "PID $pid von $PLOI_WORKER_PROGRAM läuft nicht in $ROOT_DIR. PLOI_WORKER_ID gehört zu einem anderen Projekt."
+  done
+}
+printf 'Eigenen Ploi-Daemon prüfen: %s\n' "$PLOI_WORKER_PROGRAM"
+starter_supervisorctl status "$PLOI_WORKER_ZIEL" >/dev/null \
+  || starter_fehler "Supervisor kennt '$PLOI_WORKER_PROGRAM' nicht oder supervisorctl ist nicht freigegeben. Daemon in Ploi anlegen, PLOI_WORKER_ID eintragen und die sudoers-Regel für supervisorctl prüfen (scripts/README.md)."
+ALTE_PIDS="$(starter_worker_pids || true)"
+worker_pids_pruefen "$ALTE_PIDS"
+[ -n "$ALTE_PIDS" ] || starter_hinweis "$PLOI_WORKER_PROGRAM läuft derzeit nicht (Erstdeploy oder gestoppt); er wird nach der Veröffentlichung gestartet."
 
 abschluss() {
   local status="$?"
@@ -73,123 +90,91 @@ abschluss() {
     fi
   fi
   if [ "$status" -ne 0 ] && [ "$PHASE" = "backend" ]; then
-    printf 'Backend-Abnahme fehlgeschlagen. Neuer Frontend-Build und dist.old bleiben erhalten; kein vollständiger Release-Rollback erfolgt. Siehe scripts/README.md.\n' >&2
+    printf 'Backend-Abnahme fehlgeschlagen. Neuer Frontend-Build und dist.old bleiben erhalten; kein vollständiger Release-Rollback erfolgt. Daemon-Log in Ploi prüfen. Siehe scripts/README.md.\n' >&2
   fi
 }
 trap abschluss EXIT
 
-printf 'Astro-Hono-Starter: prüfe Deploy %s\n' "$ZIEL_SHA"
-bun install --frozen-lockfile
-bun apps/backend/src/validate-env.ts
-bun run lint
-bun run typecheck
-bun test
-bun run format:check
+printf 'Deploy %s prüfen\n' "$ZIEL_SHA"
+run bun install --frozen-lockfile
+run bun apps/backend/src/validate-env.ts
+run bun run lint
+run bun run typecheck
+# Nur Anwendungstests. Die Deploy-/Nginx-Fixtures unter scripts/ gehören in CI.
+run bun test apps packages
 
 # Der bisherige Nginx-Root bleibt während Build und Audits vollständig bestehen.
-# Dev-Dependencies werden für Astro und das Qualitäts-Gate ausdrücklich benötigt.
 printf 'Frontend in dist.new bauen und prüfen\n'
 rm -rf "$FRONTEND/dist.new"
-(cd "$FRONTEND" && bun run build --outDir dist.new)
-[ -s "$FRONTEND/dist.new/index.html" ] || starter_fehler "Frontend-Build unvollständig: index.html fehlt."
-# Projektspezifische Abnahmen gehören hierhin, vor die Datenbankmigration.
+(cd "$FRONTEND" && run bun run build --outDir dist.new)
+# shellcheck source=scripts/deploy-audits.sh
+source "$SCRIPT_DIR/deploy-audits.sh"
+starter_build_audits "$FRONTEND/dist.new"
 
 # Erst ein vollständig geprüfter Build darf das Produktionsschema verändern.
 # Migrationen müssen zum noch laufenden Backend kompatibel sein. Es gibt kein
 # automatisches db:push und keinen automatischen Datenbank-Rollback.
+git_head_pruefen
 printf 'Versionierte Datenbankmigrationen anwenden\n'
-bun run db:migrate
+run bun run db:migrate
 
-# Ein vorheriger Backup-Build wird erst entfernt, wenn sein Nachfolger bereit
-# ist. Der aktuelle Build bleibt als dist.old bis zum nächsten Publish erhalten.
-# Zwei Verzeichnis-mv sind kein atomarer Symlinkwechsel: das kurze Zwischenfenster
-# wird hier ehrlich dokumentiert und bei einem Fehler über den EXIT-Trap repariert.
+# Der aktuelle Build bleibt als dist.old bis zum nächsten Deploy erhalten.
+# Zwei mv sind kein atomarer Wechsel; das kurze Fenster wird bei einem Fehler
+# über den EXIT-Trap repariert.
+git_head_pruefen
 PHASE="veroeffentlichung"
 rm -rf "$FRONTEND/dist.old"
 if [ -d "$FRONTEND/dist" ]; then mv "$FRONTEND/dist" "$FRONTEND/dist.old"; fi
 mv "$FRONTEND/dist.new" "$FRONTEND/dist"
 PHASE="backend"
 
-eigene_pids() {
-  local pid
-  for pid in $(pgrep -f "apps/backend/src/index.ts" 2>/dev/null || true); do
-    if [ "$(readlink -f "/proc/$pid/cwd" 2>/dev/null || true)" = "$ROOT_DIR" ]; then
-      printf '%s\n' "$pid"
-    fi
-  done
-}
-
-ALTE_PIDS=""
-alte_pids_aktiv() {
-  local pid
-  # Niemals pgrep erneut als Kill-Liste verwenden: Supervisor kann bereits
-  # einen neuen Prozess gestartet haben, während der alte noch beendet wird.
-  for pid in $ALTE_PIDS; do
-    if kill -0 "$pid" 2>/dev/null && [ "$(readlink -f "/proc/$pid/cwd" 2>/dev/null || true)" = "$ROOT_DIR" ]; then
-      printf '%s\n' "$pid"
-    fi
-  done
-}
-
-printf 'Eigenen Backend-Daemon neu starten\n'
-if [ -n "$PLOI_DAEMON_NAME" ]; then
-  # Die Konfiguration könnte sich während des Builds geändert haben. Vor dem
-  # einzigen Restart deshalb nochmals ausschließlich dieses Ziel zuordnen.
-  ALTE_SUPERVISOR_PID="$(supervisor_pid)" \
-    || starter_fehler "Ploi-Daemon ist vor dem Neustart nicht mehr eindeutig diesem Projekt zugeordnet."
-  sudo -n /usr/bin/supervisorctl restart "$PLOI_DAEMON_NAME" 2>/dev/null \
-    || starter_fehler "Gezielter Ploi-Neustart fehlgeschlagen. Daemon und dessen sudo-restart-Freigabe prüfen; kein Fallback."
-else
-  ALTE_PIDS="$(eigene_pids)"
-  for pid in $ALTE_PIDS; do kill "$pid" 2>/dev/null || true; done
-  for _ in $(seq 1 20); do
-    [ -z "$(alte_pids_aktiv)" ] && break
-    sleep 0.5
-  done
-  for pid in $(alte_pids_aktiv); do kill -9 "$pid" 2>/dev/null || true; done
-  for _ in $(seq 1 10); do
-    [ -z "$(alte_pids_aktiv)" ] && break
-    sleep 0.2
-  done
-  [ -z "$(alte_pids_aktiv)" ] || starter_fehler "Alter Backendprozess konnte nicht beendet werden."
+# Neustart ausschließlich über Supervisor am Programmnamen. stop + start statt
+# restart: ein gestoppter oder FATAL-Daemon (Erstdeploy, Crash nach schlechtem
+# Release) wird so ebenfalls gestartet, und der Port ist vor dem Start frei.
+printf 'Eigenen Ploi-Daemon neu starten: %s\n' "$PLOI_WORKER_PROGRAM"
+if [ -n "$ALTE_PIDS" ]; then
+  starter_supervisorctl stop "$PLOI_WORKER_ZIEL" >/dev/null \
+    || starter_fehler "Supervisor konnte $PLOI_WORKER_PROGRAM nicht stoppen."
+fi
+if ! starter_supervisorctl start "$PLOI_WORKER_ZIEL" >/dev/null; then
+  WORKER_STATUS="$(starter_supervisorctl status "$PLOI_WORKER_ZIEL" 2>/dev/null || true)"
+  [[ "$WORKER_STATUS" == *RUNNING* || "$WORKER_STATUS" == *STARTING* || "$WORKER_STATUS" == *BACKOFF* ]] \
+    || starter_fehler "Supervisor konnte $PLOI_WORKER_PROGRAM nicht starten. Daemon-Log in Ploi prüfen."
 fi
 
-neuer_daemon_vorhanden() {
-  local pid alt bekannt
-  if [ -n "$PLOI_DAEMON_NAME" ]; then
-    pid="$(supervisor_pid)" || return 1
-    [ "$pid" != "$ALTE_SUPERVISOR_PID" ] || return 1
-    # Derselbe neue Prozess muss vor und nach dem HTTP-Check bestehen bleiben.
-    # Ein Crash mit erneutem Supervisor-Start zählt nicht als stabiler Release.
-    if [ -z "$NEUE_SUPERVISOR_PID" ]; then NEUE_SUPERVISOR_PID="$pid"; fi
-    [ "$pid" = "$NEUE_SUPERVISOR_PID" ]
-    return
-  fi
-  for pid in $(eigene_pids); do
-    bekannt=false
-    for alt in $ALTE_PIDS; do [ "$pid" != "$alt" ] || bekannt=true; done
-    if [ "$bekannt" = "false" ]; then return 0; fi
-  done
-  return 1
-}
-
-# Ein zufälliges 200 reicht nicht: ein eigener, neuer Prozess muss existieren
-# und exakt die IPv4-Schnittstelle antworten, die auch Nginx verwendet.
+# Ein grüner Health-Check allein würde auch ein nie ersetzter Prozess liefern.
+# Verlangt wird: neue PID(s) laut Supervisor, Arbeitsverzeichnis = dieses
+# Projekt, und dieselbe PID beantwortet zwei aufeinanderfolgende Health-Checks.
 gesund=false
-for _ in $(seq 1 30); do
-  if neuer_daemon_vorhanden \
-    && curl --fail --silent --max-time 3 --connect-timeout 1 "$HEALTH_URL" >/dev/null 2>&1 \
-    && neuer_daemon_vorhanden; then
-    gesund=true
-    break
+NEUE_PIDS=""
+stabil=0
+for _ in $(seq 1 60); do
+  pids="$(starter_worker_pids || true)"
+  if [ -n "$pids" ] && [ "$pids" != "$ALTE_PIDS" ]; then
+    worker_pids_pruefen "$pids"
+    if curl --fail --silent --max-time 3 --connect-timeout 1 "$HEALTH_URL" >/dev/null 2>&1; then
+      if [ "$pids" = "$NEUE_PIDS" ]; then stabil=$((stabil + 1)); else NEUE_PIDS="$pids"; stabil=1; fi
+      if [ "$stabil" -ge 2 ]; then gesund=true; break; fi
+    else
+      stabil=0
+    fi
   fi
   sleep 1
 done
-[ "$gesund" = "true" ] || starter_fehler "Kein erfolgreicher Health-Check eines neuen eigenen Backends. Ploi-Daemon und dessen Log prüfen."
+[ "$gesund" = "true" ] || starter_fehler "Kein stabiler neuer Prozess von $PLOI_WORKER_PROGRAM mit erfolgreichem Health-Check auf $HEALTH_URL. Daemon-Log in Ploi prüfen."
 
-# Ein Erfolg referenziert den wirklich geprüften Commit, nicht HEAD@{1}.
-# Der temporäre Marker verhindert einen unvollständig überschriebenen SHA.
+# Nur ein Hinweis: der Daemon-Befehl in Ploi wählt seine Bun-Binärdatei selbst.
+for pid in $NEUE_PIDS; do
+  daemon_bun="$(readlink -f "/proc/$pid/exe" 2>/dev/null || true)"
+  deploy_bun="$(readlink -f "$(command -v bun)" 2>/dev/null || true)"
+  if [ -n "$daemon_bun" ] && [ -n "$deploy_bun" ] && [ "$daemon_bun" != "$deploy_bun" ]; then
+    starter_hinweis "Daemon (PID $pid) läuft mit $daemon_bun, der Deploy mit $deploy_bun. Daemon-Befehl in Ploi und BUN_INSTALL abgleichen."
+  fi
+done
+
+# Ein Erfolg referenziert den wirklich geprüften Commit. Der temporäre Marker
+# verhindert einen unvollständig überschriebenen SHA.
 (umask 077; printf '%s\n' "$ZIEL_SHA" > "$ROOT_DIR/.deploy/last-built-sha.new")
 mv "$ROOT_DIR/.deploy/last-built-sha.new" "$ROOT_DIR/.deploy/last-built-sha"
 PHASE="fertig"
-printf 'Deploy %s abgeschlossen. Vorheriger Frontend-Build bleibt in dist.old.\n' "$ZIEL_SHA"
+printf 'Deploy %s abgeschlossen. Daemon %s läuft mit PID %s; vorheriger Frontend-Build liegt in dist.old.\n' "$ZIEL_SHA" "$PLOI_WORKER_PROGRAM" "$NEUE_PIDS"

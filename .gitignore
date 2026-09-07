@@ -7,6 +7,15 @@ dist/
 dist.new/
 dist.old/
 .deploy/
+
+# Ploi legt sein Deploy-Script bei jedem Deploy als ploi-<hash>.sh im
+# Site-Verzeichnis ab. Verankert mit /, damit scripts/ploi-autodeploy.sh
+# versioniert bleibt. Ohne diesen Eintrag würde deploy.sh die Datei als
+# unversionierte Änderung melden.
+/ploi-*.sh
+
+# Persistente Dateien neben dem Checkout (überleben git reset --hard)
+storage/
 .astro/
 .output/
 build/

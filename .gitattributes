@@ -1,0 +1,29 @@
+# Zeilenenden festnageln statt sie core.autocrlf des Arbeitsplatzes zu überlassen.
+# Entwickelt wird unter Windows, ausgeführt unter Linux (Ploi). Ein CRLF hinter
+# der Shebang-Zeile macht ein Shellskript auf dem Server unbrauchbar:
+#   bash: scripts/deploy.sh: /usr/bin/env bash^M: bad interpreter
+* text=auto eol=lf
+
+*.sh text eol=lf
+*.bash text eol=lf
+.bun-version text eol=lf
+
+*.ps1 text eol=crlf
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.avif binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.mp4 binary
+*.webm binary
+*.zip binary

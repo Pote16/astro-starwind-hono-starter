@@ -134,9 +134,16 @@ in [README.md](README.md), Deployment in [scripts/README.md](scripts/README.md).
 
 - Commit und Push nur nach ausdrücklicher Nutzeranweisung. Eine Freigabe zum
   Committen ist keine Deploymentfreigabe. Keine Serveränderung aus Vorlagen ableiten.
-- Ploi-/Nginx-Dateien sind Vorbereitung, kein Nachweis eines aktiven Deployments.
-  Runtime und Server werden manuell vorbereitet; Hooks führen kein globales Bun-Update aus.
-- Deploymentvertrag und Grenzen in [scripts/README.md](scripts/README.md) beachten:
-  vertrauenswürdiges Remote, `main`/Fast-Forward, exklusiver Lock, Gates vor Migration,
-  Frontendwechsel und Health-Abnahme. Der Verzeichniswechsel ist nicht vollständig
-  atomar; kein automatischer DB-/Gesamtrelease-Rollback behaupten.
+- `scripts/` ist der Referenz-Deploy-Harness für alle Ploi-Sites; Vertrag und
+  Einrichtung stehen in [scripts/README.md](scripts/README.md), Entscheidungen in
+  [docs/superpowers/specs/2026-09-07-ploi-deploy-harness-design.md](docs/superpowers/specs/2026-09-07-ploi-deploy-harness-design.md).
+  `ploi-autodeploy.sh` und `nginx.conf` spiegeln das Ploi-Panel und ändern es nicht.
+- Der Daemon wird ausschließlich über `PLOI_WORKER_ID` (Supervisor-Programm
+  `worker-<id>`) neu gestartet. Kein `pkill`/`pgrep`/`kill` in Deploy-Skripten: auf dem
+  gemeinsamen Server starten alle Sites dieselbe Kommandozeile. `harness.test.ts`
+  prüft diesen Vertrag; `.gitignore` muss `/ploi-*.sh` behalten.
+- `NODE_ENV=production` gehört in die Ploi-Environment (`.env`), nie als Export in
+  ein Skript: Deploy, Cronjobs und Daemon lesen dieselbe Datei.
+- Gates vor Migration, `dist.new`-Wechsel und Health-Abnahme mit neuer PID sind
+  Pflicht. Der Verzeichniswechsel ist nicht vollständig atomar; kein automatischer
+  DB-/Gesamtrelease-Rollback behaupten. Nginx wird vom Deploy nicht neu geladen.

@@ -48,8 +48,8 @@ jobs:
 
       - name: Shellskripte prüfen
         run: |
-          for script in scripts/*.sh; do bash -n "$script"; done
-          shellcheck scripts/*.sh
+          for script in scripts/*.sh scripts/cronjobs/*.sh; do bash -n "$script"; done
+          shellcheck -x scripts/*.sh scripts/cronjobs/*.sh
 
       - name: Lint
         timeout-minutes: 5

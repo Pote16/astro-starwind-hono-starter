@@ -208,19 +208,22 @@ apps/frontend/       Astro-Seiten, gemeinsames Template, Übersetzungen, Starwin
 apps/backend/        Hono-API, Middleware, Umgebungsvalidierung und Tests
 packages/db/         Drizzle-Schema, Client und Migrationen
 packages/logger/     Gemeinsamer Pino-Logger
-scripts/             Vorbereitete Ploi- und Nginx-Dateien, Deploy-Tests
+scripts/             Ploi-Deploy-Harness, Nginx-Vorlage, Cron-Wrapper, Deploy-Tests
 .bun-version         Verbindlicher Bun-Pin
 bun.lock             Geprüfter Paketstand
 .env.example         Umgebungsvertrag ohne echte Zugangsdaten
 ```
 
-## Deployment und spätere Cronjobs
+## Deployment und Cronjobs
 
-Die [Ploi-Anleitung](scripts/README.md) erklärt die manuelle Einrichtung von Site,
-Runtime, Datenbank, Daemon, Nginx und Push-Webhook. Die eingecheckten Dateien sind
-**Vorlagen** und aktivieren weder Autodeploy noch einen Serverdienst. Der Deploy
-prüft einen neuen Build vor der Migration und behält den vorherigen Frontend-Build;
-die zwei Verzeichniswechsel sind kein vollständig atomarer Release-Wechsel.
+`scripts/` ist der Referenz-Harness für alle Ploi-Sites: Push auf `main` → Ploi-Hook
+(`git reset --hard origin/main`) → `scripts/deploy.sh`. Der Deploy lädt die von Ploi
+geschriebene `.env` (Pflicht: `NODE_ENV=production`, `PLOI_WORKER_ID`), prüft Bun-Pin,
+Lint, Typen und Tests, baut nach `dist.new`, migriert, tauscht das Frontend und
+startet ausschließlich den eigenen Supervisor-Daemon `worker-<id>` neu, mit
+Nachweis einer neuen PID und Health-Check. Die [Ploi-Anleitung](scripts/README.md)
+beschreibt Einrichtung, Ablauf und Grenzen; die Entscheidungen stehen im
+[Design](docs/superpowers/specs/2026-09-07-ploi-deploy-harness-design.md).
 
-Es ist kein Cronjob eingerichtet. [CRON.md](scripts/CRON.md) beschreibt die
-Voraussetzungen, sobald eine konkrete wiederkehrende Aufgabe implementiert wird.
+Cronjobs laufen ausschließlich über `scripts/cronjobs/run.sh`
+([Muster und Zeitpläne](scripts/cronjobs/README.md)); aktuell ist keiner freigeschaltet.

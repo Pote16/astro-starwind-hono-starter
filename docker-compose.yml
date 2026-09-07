@@ -8,7 +8,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-db_password}
       POSTGRES_DB: ${POSTGRES_DB:-db_name}
     ports:
-      - "127.0.0.1:5435:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5435}:5432"
     volumes:
       - ho_setup_pgdata:/var/lib/postgresql
     healthcheck:

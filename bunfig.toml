@@ -1,3 +1,4 @@
 [test]
-# Playwright hat einen eigenen Runner und eigene Lebenszyklen.
-pathIgnorePatterns = ["e2e/**"]
+# Playwright hat einen eigenen Runner und eigene Lebenszyklen; Build-Ausgaben
+# und der Deploy-Zustand enthalten keine Tests.
+pathIgnorePatterns = ["e2e/**", "**/dist/**", "**/dist.new/**", "**/dist.old/**", ".deploy/**"]

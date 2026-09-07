@@ -11,14 +11,20 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { afterEach, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 
+/**
+ * Deploy-Fixtures: Kopien der Skripte laufen mit simuliertem bun, git, sudo,
+ * supervisorctl, curl und /proc. Niemals echte Installationen, Migrationen,
+ * Neustarts oder HTTP-Aufrufe. Bash, flock und /proc setzen Linux voraus;
+ * unter Windows wird die Suite übersprungen (CI führt sie auf Ubuntu aus).
+ */
+const linux = process.platform !== "win32" && Bun.which("bash") !== null;
 const sha = "1234567890abcdef1234567890abcdef12345678";
 const flockProgramm = Bun.which("flock");
 const pythonProgramm = Bun.which("python3");
 const aktiveFixtures = new Set<() => Promise<void>>();
 
-// Bun bricht einen Test ab, ohne dessen asynchrone Arbeit automatisch zu stoppen.
 afterEach(async () => {
   await Promise.all([...aktiveFixtures].map((dispose) => dispose()));
 }, 10_000);
@@ -27,7 +33,9 @@ async function text(datei: string): Promise<string> {
   return readFile(datei, "utf8").catch(() => "");
 }
 
-/** Nur Skriptkopien und simulierte Prozesse: niemals echte Bun-/Git-/HTTP-Aufrufe. */
+const produktionsEnv =
+  "NODE_ENV=production\nDATABASE_URL=postgres://fixture.invalid/test\nPORT=3005\nPLOI_WORKER_ID=123\n";
+
 async function fixture(variablen: Record<string, string> = {}) {
   const root = await realpath(await mkdtemp(join(tmpdir(), "starter-deploy-test-")));
   const prozesse = new Set<ReturnType<typeof Bun.spawn>>();
@@ -36,8 +44,6 @@ async function fixture(variablen: Record<string, string> = {}) {
   let aufraeumen: Promise<void> | undefined;
 
   function beenden(prozess: ReturnType<typeof Bun.spawn>) {
-    // detached erzeugt eine eigene POSIX-Prozessgruppe. Nur diese Testgruppe
-    // darf beendet werden, einschließlich Kindern, die stdout/Locks offen halten.
     try {
       process.kill(-prozess.pid, "SIGKILL");
     } catch (error) {
@@ -56,24 +62,34 @@ async function fixture(variablen: Record<string, string> = {}) {
     })();
     return aufraeumen;
   }
+
   for (const ordner of [
-    "scripts",
+    "scripts/cronjobs",
     "bin",
     ".deploy",
     "apps/frontend/dist",
     "apps/frontend/dist.old",
+    "apps/backend/src/jobs",
   ])
     await mkdir(join(root, ordner), { recursive: true });
-  for (const name of ["deploy.sh", "deploy-common.sh", "start-backend.sh", "ploi-autodeploy.sh"])
+  for (const name of [
+    "deploy.sh",
+    "deploy-common.sh",
+    "deploy-audits.sh",
+    "start-backend.sh",
+    "ploi-autodeploy.sh",
+  ])
     await copyFile(new URL(name, import.meta.url), join(root, "scripts", name));
-  await writeFile(join(root, ".bun-version"), "1.4.2\n");
-  await writeFile(
-    join(root, ".env"),
-    "DATABASE_URL=postgres://fixture.invalid/test\nPORT=3005\nDEPLOY_REPOSITORY=https://github.com/Pote16/astro-starwind-hono-starter.git\n",
+  await copyFile(
+    new URL("cronjobs/run.sh", import.meta.url),
+    join(root, "scripts/cronjobs/run.sh"),
   );
+  await writeFile(join(root, ".bun-version"), "1.4.2\n");
+  await writeFile(join(root, ".env"), produktionsEnv);
   await writeFile(join(root, "apps/frontend/dist/index.html"), "bisherig");
   await writeFile(join(root, "apps/frontend/dist.old/index.html"), "aelter");
   await writeFile(join(root, ".deploy/last-built-sha"), "vorheriger-erfolg\n");
+  await writeFile(join(root, "apps/backend/src/jobs/demo.ts"), "");
   await writeFile(
     join(root, "bin/bun"),
     `#!/bin/bash
@@ -81,15 +97,20 @@ set -eu
 printf 'bun %s\\n' "$*" >> "$FIXTURE_ROOT/aufrufe"
 if [ "$*" = "--version" ]; then printf '%s\\n' "\${FIXTURE_VERSION:-1.4.2}"; exit 0; fi
 if [ -n "\${FIXTURE_FAIL:-}" ] && [[ "$*" == *"$FIXTURE_FAIL"* ]]; then exit 23; fi
-if [ "$*" = "install --frozen-lockfile" ] && [ "\${FIXTURE_HOLD:-0}" = 1 ]; then
-  touch "$FIXTURE_ROOT/bereit"
-  for _ in $(seq 1 500); do
-    [ ! -f "$FIXTURE_ROOT/freigabe" ] || break
-    /bin/sleep 0.01
-  done
+if [ "$*" = "install --frozen-lockfile" ]; then
+  touch "$FIXTURE_ROOT/installiert"
+  if [ "\${FIXTURE_HOLD:-0}" = 1 ]; then
+    touch "$FIXTURE_ROOT/bereit"
+    for _ in $(seq 1 500); do
+      [ ! -f "$FIXTURE_ROOT/freigabe" ] || break
+      /bin/sleep 0.01
+    done
+  fi
 fi
 if [ "$*" = "run build --outDir dist.new" ]; then
-  mkdir -p dist.new; printf neu > dist.new/index.html
+  mkdir -p dist.new/en; printf neu > dist.new/index.html; printf en > dist.new/en/index.html
+  printf 'robots' > dist.new/robots.txt
+  [ "\${FIXTURE_NO_404:-0}" = 1 ] || printf '404' > dist.new/404.html
 fi
 if [ "$*" = "run apps/backend/src/index.ts" ]; then
   printf 'daemon %s %s %s\\n' "$PWD" "$NODE_ENV" "$CI" >> "$FIXTURE_ROOT/aufrufe"
@@ -99,84 +120,73 @@ fi
   await chmod(join(root, "bin/bun"), 0o755);
   await writeFile(
     join(root, "sicherheit.sh"),
-    `# Wird von jeder Test-Bash geladen; kill erreicht niemals das Betriebssystem.
+    `# Wird von jeder Test-Bash geladen; nichts erreicht das Betriebssystem.
 git() {
   printf 'git %s\\n' "$*" >> "$FIXTURE_ROOT/aufrufe"
   case "$*" in
-    'diff --quiet'|'diff --cached --quiet') return 0 ;;
-    'ls-files --others --exclude-standard')
-      [ "\${FIXTURE_UNTRACKED_FAIL:-0}" != 1 ] || return 1
-      if [ "\${FIXTURE_UNTRACKED:-0}" = 1 ]; then printf 'apps/frontend/src/pages/unreviewed.astro\\n'; fi
+    'status --porcelain --untracked-files=no')
+      if [ "\${FIXTURE_MODIFIED:-0}" = 1 ]; then printf ' M scripts/deploy.sh\\n'; fi
       return 0 ;;
-    'rev-parse HEAD^{commit}') printf '%s\\n' "\${FIXTURE_HEAD:-${sha}}" ;;
-    'rev-parse FETCH_HEAD^{commit}') printf '${sha}\\n' ;;
-    'symbolic-ref --short HEAD') printf 'main\\n' ;;
-    'remote get-url origin') printf '%s\\n' "\${FIXTURE_ORIGIN:-https://github.com/Pote16/astro-starwind-hono-starter.git}" ;;
-    'fetch --no-tags origin main'|'merge --ff-only ${sha}') return 0 ;;
+    'ls-files --others --exclude-standard -- apps packages scripts')
+      if [ "\${FIXTURE_UNTRACKED_SRC:-0}" = 1 ]; then printf 'apps/frontend/src/pages/unreviewed.astro\\n'; fi
+      return 0 ;;
+    'ls-files --others --exclude-standard')
+      if [ "\${FIXTURE_UNTRACKED:-0}" = 1 ]; then printf 'ploi-1a2b3c.sh\\n'; fi
+      return 0 ;;
+    'rev-parse HEAD^{commit}')
+      if [ "\${FIXTURE_HEAD_DRIFT:-0}" = 1 ] && [ -f "$FIXTURE_ROOT/installiert" ]; then printf 'ffffffffffffffffffffffffffffffffffffffff\\n'; else printf '${sha}\\n'; fi ;;
+    'fetch origin'|'reset --hard origin/main') return 0 ;;
     *) return 97 ;;
   esac
 }
-pgrep() {
-  printf 'pgrep %s\\n' "$*" >> "$FIXTURE_ROOT/aufrufe"
-  if [ -f "$FIXTURE_ROOT/terminiert" ] && [ "\${FIXTURE_NO_NEW:-0}" != 1 ]; then printf '410003\\n410002\\n'; else printf '410001\\n410002\\n'; fi
+supervisor_status_zeile() {
+  # Zustand des simulierten Supervisor-Programms worker-123.
+  local modus="\${FIXTURE_WORKER:-ok}" gestartet=0 zaehler
+  [ -f "$FIXTURE_ROOT/worker-start" ] && gestartet=1
+  case "$modus" in
+    missing) printf 'worker-123:*: ERROR (no such process)\\n'; return 1 ;;
+    stopped) if [ "$gestartet" = 1 ]; then printf 'worker-123:worker-123_00   RUNNING   pid 4712, uptime 0:00:01\\n'; else printf 'worker-123:worker-123_00   STOPPED   Sep 07 10:00 AM\\n'; fi; return 0 ;;
+    foreign) printf 'worker-123:worker-123_00   RUNNING   pid 9999, uptime 0:10:00\\n'; return 0 ;;
+    unchanged) printf 'worker-123:worker-123_00   RUNNING   pid 4711, uptime 0:10:00\\n'; return 0 ;;
+    new-foreign) if [ "$gestartet" = 1 ]; then printf 'worker-123:worker-123_00   RUNNING   pid 9999, uptime 0:00:01\\n'; else printf 'worker-123:worker-123_00   RUNNING   pid 4711, uptime 0:10:00\\n'; fi; return 0 ;;
+    unstable)
+      if [ "$gestartet" = 1 ]; then
+        zaehler=$(( $(cat "$FIXTURE_ROOT/status-zaehler" 2>/dev/null || echo 0) + 1 )); printf '%s' "$zaehler" > "$FIXTURE_ROOT/status-zaehler"
+        printf 'worker-123:worker-123_00   RUNNING   pid %s, uptime 0:00:01\\n' "$((4712 + zaehler))"
+      else printf 'worker-123:worker-123_00   RUNNING   pid 4711, uptime 0:10:00\\n'; fi; return 0 ;;
+    start-fail) printf 'worker-123:worker-123_00   FATAL   Exited too quickly\\n'; return 0 ;;
+    *) if [ "$gestartet" = 1 ]; then printf 'worker-123:worker-123_00   RUNNING   pid 4712, uptime 0:00:01\\n'; else printf 'worker-123:worker-123_00   RUNNING   pid 4711, uptime 0:10:00\\n'; fi; return 0 ;;
+  esac
 }
 sudo() {
-  # Auch bei fehlerhaften Argumenten niemals an echtes sudo weiterreichen.
   printf 'sudo %s\\n' "$*" >> "$FIXTURE_ROOT/aufrufe"
-  if [ "$#" = 5 ]; then
-    [ "$1" = -n ] && [ "$2" = -l ] && [ "$3" = /usr/bin/supervisorctl ] && [ "$4" = restart ] && [ "$5" = worker-123:worker-123_00 ] || return 98
-    [ "\${FIXTURE_WORKER:-ok}" != restart-denied ]; return
-  fi
-  [ "$#" = 4 ] && [ "$1" = -n ] && [ "$2" = /usr/bin/supervisorctl ] && [ "$4" = worker-123:worker-123_00 ] || return 98
-  case "\${FIXTURE_WORKER:-ok}" in
-    denied|missing) return 1 ;;
-  esac
+  [ "$1" = -n ] && [ "$2" = /usr/bin/supervisorctl ] || return 98
+  [ "\${FIXTURE_WORKER:-ok}" != denied ] || { printf 'sudo: a password is required\\n' >&2; return 1; }
+  [ "$4" = 'worker-123:*' ] || { printf '%s: ERROR (no such process)\\n' "$4"; return 1; }
   case "$3" in
-    pid)
-      case "\${FIXTURE_WORKER:-ok}" in
-        foreign) printf '410002\\n'; return ;;
-        drift) if [ "$(cat "$FIXTURE_ROOT/apps/frontend/dist/index.html")" = neu ]; then printf '410002\\n'; return; fi ;;
-        zero) printf '0\\n'; return ;;
-        multiple) printf '410001\\n410003\\n'; return ;;
-      esac
-      if [ -f "$FIXTURE_ROOT/worker-restart" ]; then
-        case "\${FIXTURE_WORKER:-ok}" in
-          unchanged) printf '410001\\n' ;;
-          new-foreign) printf '410002\\n' ;;
-          unstable) if [ -f "$FIXTURE_ROOT/http-geprueft" ]; then printf '410004\\n'; else printf '410003\\n'; fi ;;
-          *) printf '410003\\n' ;;
-        esac
-      else printf '410001\\n'; fi ;;
-    restart)
-      [ "\${FIXTURE_WORKER:-ok}" != restart-fail ] || return 1
-      touch "$FIXTURE_ROOT/worker-restart" ;;
+    status) supervisor_status_zeile ;;
+    stop) printf 'worker-123:worker-123_00: stopped\\n'; touch "$FIXTURE_ROOT/worker-stop" ;;
+    start)
+      if [ "\${FIXTURE_WORKER:-ok}" = start-fail ]; then printf 'worker-123:worker-123_00: ERROR (spawn error)\\n'; return 1; fi
+      printf 'worker-123:worker-123_00: started\\n'; touch "$FIXTURE_ROOT/worker-start" ;;
     *) return 99 ;;
   esac
 }
 readlink() {
   case "$*" in
-    '-f /proc/410001/cwd'|'-f /proc/410003/cwd'|'-f /proc/410004/cwd') printf '%s\\n' "$FIXTURE_ROOT" ;;
-    '-f /proc/410002/cwd') printf '/fremdes-projekt\\n' ;;
-    *) case "$*" in
-      *'/fd/9') printf '%s/.deploy/deploy.lock\\n' "$FIXTURE_ROOT" ;;
-      *) return 98 ;;
-    esac ;;
-  esac
-}
-kill() {
-  printf 'kill %s\\n' "$*" >> "$FIXTURE_ROOT/aufrufe"
-  case "$*" in
-    '-0 410001') [ ! -f "$FIXTURE_ROOT/beendet" ] ;;
-    '410001') touch "$FIXTURE_ROOT/terminiert" ;;
-    '-9 410001') touch "$FIXTURE_ROOT/beendet" ;;
-    *) return 99 ;;
+    '-f /proc/4711/cwd'|'-f /proc/4712/cwd'|'-f /proc/4713/cwd'|'-f /proc/4714/cwd') printf '%s\\n' "$FIXTURE_ROOT" ;;
+    '-f /proc/9999/cwd') printf '/fremdes-projekt\\n' ;;
+    -f\\ /proc/*/exe) printf '%s/bin/bun\\n' "$FIXTURE_ROOT" ;;
+    *) command readlink "$@" ;;
   esac
 }
 curl() {
   printf 'curl %s\\n' "$*" >> "$FIXTURE_ROOT/aufrufe"
-  touch "$FIXTURE_ROOT/http-geprueft"
   [ "\${FIXTURE_HEALTH:-ok}" = ok ]
 }
+pgrep() { printf 'pgrep %s\\n' "$*" >> "$FIXTURE_ROOT/aufrufe"; return 1; }
+pkill() { printf 'pkill %s\\n' "$*" >> "$FIXTURE_ROOT/aufrufe"; return 1; }
+kill() { printf 'kill %s\\n' "$*" >> "$FIXTURE_ROOT/aufrufe"; return 1; }
 sleep() { :; }
 mv() {
   if [ "\${FIXTURE_PUBLISH_FAIL:-0}" = 1 ] && [ "$1" = "$FIXTURE_ROOT/apps/frontend/dist.new" ]; then return 24; fi
@@ -184,15 +194,14 @@ mv() {
 }
 flock() {
   if [ -n "$FIXTURE_FLOCK_BIN" ]; then "$FIXTURE_FLOCK_BIN" "$@"; return; fi
-  if [ -z "$FIXTURE_PYTHON_BIN" ]; then
-    # Ohne Lock-Werkzeug bleiben die Kontrollflusstests lauffähig. Ausschließlich
-    # der echte Konkurrenztest wird dann ausdrücklich übersprungen.
-    [ -e /dev/fd/9 ]; return
-  fi
+  if [ -z "$FIXTURE_PYTHON_BIN" ]; then return 0; fi
   # Python schließt nur seine Kopie; die aufrufende Bash hält den Lock weiter.
+  local fd="\${*: -1}" art="EX"
+  case "$*" in *-s*) art="SH" ;; esac
   "$FIXTURE_PYTHON_BIN" -c 'import fcntl,sys
-try: fcntl.flock(9, fcntl.LOCK_EX | fcntl.LOCK_NB)
-except (BlockingIOError, OSError): sys.exit(1)'
+fd=int(sys.argv[1]); art=getattr(fcntl, "LOCK_"+sys.argv[2])
+try: fcntl.flock(fd, art | fcntl.LOCK_NB)
+except (BlockingIOError, OSError): sys.exit(1)' "$fd" "$art"
 }
 `,
   );
@@ -204,6 +213,7 @@ except (BlockingIOError, OSError): sys.exit(1)'
     FIXTURE_ROOT: root,
     FIXTURE_FLOCK_BIN: flockProgramm ?? "",
     FIXTURE_PYTHON_BIN: pythonProgramm ?? "",
+    STARTER_LOCK_WAIT: "1",
     ...variablen,
   };
   aktiveFixtures.add(dispose);
@@ -212,10 +222,10 @@ except (BlockingIOError, OSError): sys.exit(1)'
     async env(inhalt: string) {
       await writeFile(join(root, ".env"), inhalt);
     },
-    run(skript = "deploy.sh", zeitlimit = 20_000) {
+    run(skript = "deploy.sh", argumente: string[] = [], zeitlimit = 20_000) {
       if (geschlossen) throw new Error("Die Deploy-Fixture ist bereits geschlossen.");
       let abgelaufen = false;
-      const prozess = Bun.spawn(["/bin/bash", join(root, "scripts", skript)], {
+      const prozess = Bun.spawn(["/bin/bash", join(root, "scripts", skript), ...argumente], {
         cwd: tmpdir(),
         env,
         stdout: "pipe",
@@ -245,8 +255,6 @@ except (BlockingIOError, OSError): sys.exit(1)'
         }
       })();
       ausfuehrungen.add(ergebnis);
-      // Der Konkurrenztest wartet erst später auf seinen ersten Prozess.
-      // Auch bei vorherigem Testabbruch muss dessen Ablehnung behandelt sein.
       void ergebnis.finally(() => ausfuehrungen.delete(ergebnis)).catch(() => {});
       return ergebnis;
     },
@@ -254,294 +262,322 @@ except (BlockingIOError, OSError): sys.exit(1)'
   };
 }
 
-test("fehlerhafte Umgebung bleibt geheim und bricht vor jeder Runtime-/Deployaktion ab", async () => {
-  for (const inhalt of [
-    null,
-    "STARTER_TEST_SECRET=fixture-secret-value\n$NICHT_GESETZT\n",
-    "SECRET='fixture-secret-value\n",
-  ]) {
-    const f = await fixture();
-    try {
-      if (inhalt === null) await rm(join(f.root, ".env"));
-      else await f.env(inhalt);
-      const r = await f.run();
-      expect(r.code, `${String(inhalt)}: ${r.ausgabe}`).not.toBe(0);
-      expect(r.ausgabe).toContain("Abbruch:");
-      expect(r.ausgabe).not.toContain("fixture-secret-value");
-      expect(r.aufrufe).toBe("");
-    } finally {
-      await f.dispose();
-    }
-  }
-}, 60_000);
+async function unveraendert(root: string) {
+  expect(await text(join(root, "apps/frontend/dist/index.html"))).toBe("bisherig");
+  expect(await text(join(root, "apps/frontend/dist.old/index.html"))).toBe("aelter");
+  expect(await text(join(root, ".deploy/last-built-sha"))).toBe("vorheriger-erfolg\n");
+}
 
-test("Bun-Pin und Produktionsschutz blockieren Installation und Datenbankänderungen", async () => {
-  for (const vars of [
-    { FIXTURE_VERSION: "1.4.1" },
-    { RESET_DB: "true" },
-    { PORT: "65536" },
-    { DATABASE_URL: "" },
-  ]) {
-    const f = await fixture(vars);
-    try {
-      // Die .env hat Vorrang vor Supervisor-Werten und wird hier gezielt gesetzt.
-      if ("PORT" in vars) await f.env("DATABASE_URL=postgres://fixture.invalid/test\nPORT=65536\n");
-      if ("DATABASE_URL" in vars) await f.env("PORT=3005\n");
-      const r = await f.run();
-      expect(r.code).not.toBe(0);
-      expect(r.aufrufe).not.toContain("bun install");
-      expect(r.aufrufe).not.toContain("db:migrate");
-      expect(await text(join(f.root, "apps/frontend/dist/index.html"))).toBe("bisherig");
-    } finally {
-      await f.dispose();
-    }
-  }
-}, 60_000);
-
-test("fehlgeschlagene Gates und Umgebung lassen bisherigen Build und Datenbank unangetastet", async () => {
-  for (const fehler of [
-    "run lint",
-    "run typecheck",
-    "test",
-    "run format:check",
-    "run build",
-    "validate-env.ts",
-  ]) {
-    const f = await fixture({ FIXTURE_FAIL: fehler });
-    try {
-      const r = await f.run();
-      expect(r.code).not.toBe(0);
-      expect(r.aufrufe).not.toContain("db:migrate");
-      expect(r.aufrufe).not.toContain("kill ");
-      expect(await text(join(f.root, "apps/frontend/dist/index.html"))).toBe("bisherig");
-      expect(await text(join(f.root, "apps/frontend/dist.old/index.html"))).toBe("aelter");
-      expect(await text(join(f.root, ".deploy/last-built-sha"))).toBe("vorheriger-erfolg\n");
-    } finally {
-      await f.dispose();
-    }
-  }
-}, 60_000);
-
-test("Publikationsfehler stellt dist wieder her; späterer Healthfehler meldet keinen Erfolg", async () => {
-  for (const vars of [
-    { FIXTURE_PUBLISH_FAIL: "1" },
-    { FIXTURE_HEALTH: "fehler" },
-    { FIXTURE_NO_NEW: "1" },
-  ]) {
-    const f = await fixture(vars);
-    try {
-      const r = await f.run();
-      expect(r.code).not.toBe(0);
-      expect(r.aufrufe).toContain("db:migrate");
-      expect(await text(join(f.root, ".deploy/last-built-sha"))).toBe("vorheriger-erfolg\n");
-      if ("FIXTURE_PUBLISH_FAIL" in vars) {
-        expect(await text(join(f.root, "apps/frontend/dist/index.html"))).toBe("bisherig");
-        expect(r.aufrufe).not.toContain("kill ");
-        expect(r.ausgabe).toContain("wiederhergestellt");
-      } else {
-        expect(await text(join(f.root, "apps/frontend/dist/index.html"))).toBe("neu");
-        expect(await text(join(f.root, "apps/frontend/dist.old/index.html"))).toBe("bisherig");
-        expect(r.ausgabe).toContain("kein vollständiger Release-Rollback");
-        if ("FIXTURE_NO_NEW" in vars) expect(r.aufrufe).not.toContain("curl ");
-      }
-    } finally {
-      await f.dispose();
-    }
-  }
-}, 60_000);
-
-test("Ploi-Hook schützt Origin/Zielcommit und übergibt seinen Lock an den Deploy", async () => {
-  for (const vars of [
-    {},
-    { FIXTURE_ORIGIN: "https://example.invalid/anderes-projekt.git" },
-    { FIXTURE_HEAD: "lokaler-ahead-commit" },
-  ]) {
-    const f = await fixture(vars);
-    try {
-      const datei = join(f.root, "scripts/ploi-autodeploy.sh");
-      await writeFile(
-        datei,
-        (await text(datei)).replace("{SITE_DIRECTORY}", f.root).replace("{BRANCH}", "main"),
-      );
-      const r = await f.run("ploi-autodeploy.sh");
-      if ("FIXTURE_ORIGIN" in vars || "FIXTURE_HEAD" in vars) {
-        expect(r.code).not.toBe(0);
-        expect(r.aufrufe).not.toContain("bun install");
-        if ("FIXTURE_ORIGIN" in vars) expect(r.aufrufe).not.toContain("git fetch");
-      } else {
-        expect(r.code, r.ausgabe).toBe(0);
-        expect(r.aufrufe.indexOf("git merge --ff-only")).toBeLessThan(
-          r.aufrufe.indexOf("bun --version"),
-        );
-        expect(await text(join(f.root, ".deploy/last-built-sha"))).toBe(`${sha}\n`);
-      }
-    } finally {
-      await f.dispose();
-    }
-  }
-  const f = await fixture({ STARTER_DEPLOY_LOCK: "1" });
-  try {
-    const r = await f.run();
-    expect(r.code).not.toBe(0);
-    expect(r.aufrufe).not.toContain("bun install");
-  } finally {
-    await f.dispose();
-  }
-}, 60_000);
-
-test("Erfolg prüft Staging vor Migration, beendet nur alte eigene PIDs und schreibt Commitmarker", async () => {
-  const f = await fixture();
-  try {
-    const r = await f.run();
-    expect(r.code, r.ausgabe).toBe(0);
-    expect(r.aufrufe.indexOf("run build --outDir dist.new")).toBeLessThan(
-      r.aufrufe.indexOf("db:migrate"),
-    );
-    expect(r.aufrufe).toContain("bun apps/backend/src/validate-env.ts");
-    expect(r.aufrufe).toContain("kill 410001");
-    expect(r.aufrufe).toContain("kill -9 410001");
-    expect(r.aufrufe).not.toMatch(/kill[^\n]*41000[23]/);
-    expect(r.aufrufe).toContain("http://127.0.0.1:3005/health");
-    expect(await text(join(f.root, "apps/frontend/dist.old/index.html"))).toBe("bisherig");
-    expect(await text(join(f.root, ".deploy/last-built-sha"))).toBe(`${sha}\n`);
-    const daemon = await f.run("start-backend.sh");
-    expect(daemon.code, daemon.ausgabe).toBe(0);
-    expect(daemon.aufrufe).toContain(`daemon ${f.root} production true`);
-  } finally {
-    await f.dispose();
-  }
-}, 60_000);
-
-test("konfigurierter Worker blockiert unsichere Namen, fremde PIDs und fehlenden Zugriff vor Installation", async () => {
-  for (const fall of [
-    { name: "all" },
-    { name: "worker-123:all" },
-    { name: "worker-123:*" },
-    { name: "worker-123 worker-456" },
-    { name: "worker-123,worker-456" },
-    { name: "--help" },
-    { fehler: "denied" },
-    { fehler: "restart-denied" },
-    { fehler: "missing" },
-    { fehler: "foreign" },
-    { fehler: "zero" },
-    { fehler: "multiple" },
-  ]) {
-    const f = await fixture({ FIXTURE_WORKER: fall.fehler ?? "ok" });
-    try {
-      await f.env(
-        `DATABASE_URL=postgres://fixture.invalid/test\nPLOI_DAEMON_NAME='${fall.name ?? "worker-123:worker-123_00"}'\n`,
-      );
-      const r = await f.run();
-      expect(r.code, JSON.stringify(fall)).not.toBe(0);
-      expect(r.aufrufe).not.toContain("bun install");
-      expect(r.aufrufe).not.toContain("db:migrate");
-      expect(r.aufrufe).not.toContain("pgrep ");
-      expect(r.aufrufe).not.toContain("kill ");
-      if (fall.name) expect(r.aufrufe).not.toContain("sudo ");
-      expect(await text(join(f.root, "apps/frontend/dist/index.html"))).toBe("bisherig");
-    } finally {
-      await f.dispose();
-    }
-  }
-}, 60_000);
-
-test("fester Worker startet ausschließlich sein exaktes Ziel und verlangt einen neuen eigenen Prozess", async () => {
-  for (const fehler of ["ok", "restart-fail", "unchanged", "new-foreign", "drift", "unstable"]) {
-    const f = await fixture({ FIXTURE_WORKER: fehler });
-    try {
-      await f.env(
-        "DATABASE_URL=postgres://fixture.invalid/test\nPLOI_DAEMON_NAME=worker-123:worker-123_00\n",
-      );
-      const r = await f.run();
-      const pidAufruf = "sudo -n /usr/bin/supervisorctl pid worker-123:worker-123_00";
-      expect(r.aufrufe).toContain(pidAufruf);
-      expect(r.aufrufe.indexOf(pidAufruf)).toBeLessThan(r.aufrufe.indexOf("bun install"));
-      expect(
-        r.aufrufe.match(/sudo -n \/usr\/bin\/supervisorctl restart worker-123:worker-123_00/g) ??
-          [],
-      ).toHaveLength(fehler === "drift" ? 0 : 1);
-      expect(r.aufrufe).not.toContain("pgrep ");
-      expect(r.aufrufe).not.toContain("kill ");
-      expect(await text(join(f.root, "apps/frontend/dist.old/index.html"))).toBe("bisherig");
-      const marker = await text(join(f.root, ".deploy/last-built-sha"));
-      if (fehler === "ok") {
-        expect(r.code, r.ausgabe).toBe(0);
-        expect(marker).toBe(`${sha}\n`);
-        expect(r.aufrufe).toContain("http://127.0.0.1:3005/health");
-      } else {
-        expect(r.code).not.toBe(0);
-        expect(marker).toBe("vorheriger-erfolg\n");
-        if (fehler === "unstable") expect(r.aufrufe.match(/curl /g)).toHaveLength(1);
-        else expect(r.aufrufe).not.toContain("curl ");
-      }
-    } finally {
-      await f.dispose();
-    }
-  }
-}, 60_000);
-
-test.skipIf(!flockProgramm && !pythonProgramm)(
-  "gemeinsamer Lock verhindert einen zweiten Deploy vor der Installation",
-  async () => {
-    const f = await fixture({ FIXTURE_HOLD: "1" });
-    try {
-      const erster = f.run();
-      for (let i = 0; i < 200 && !(await Bun.file(join(f.root, "bereit")).exists()); i++)
-        await Bun.sleep(10);
-      expect(await Bun.file(join(f.root, "bereit")).exists()).toBe(true);
-      const zweiter = await f.run();
-      expect(zweiter.code).not.toBe(0);
-      expect(zweiter.ausgabe).toContain("Ein anderer Deploy läuft bereits");
-      expect(zweiter.aufrufe.match(/bun install/g)).toHaveLength(1);
-      await writeFile(join(f.root, "freigabe"), "1");
-      const fertig = await erster;
-      expect(fertig.code, fertig.ausgabe).toBe(0);
-    } finally {
-      await f.dispose();
-    }
-  },
-  60_000,
-);
-
-test("unversionierte Dateien und fehlgeschlagene Git-Prüfung stoppen vor Fetch oder Installation", async () => {
-  for (const script of ["deploy.sh", "ploi-autodeploy.sh"]) {
-    for (const vars of [{ FIXTURE_UNTRACKED: "1" }, { FIXTURE_UNTRACKED_FAIL: "1" }]) {
-      const f = await fixture(vars);
+describe.skipIf(!linux)("deploy.sh", () => {
+  test("fehlerhafte .env bleibt geheim und bricht vor jeder Aktion ab; Zeilennummer wird genannt", async () => {
+    for (const inhalt of [
+      null,
+      "STARTER_TEST_SECRET=fixture-secret-value\nSECRET='fixture-secret-value\n",
+      "NODE_ENV=production\nGUT=1\nSCHLECHT=fixture-secret-value hat leerzeichen\n",
+    ]) {
+      const f = await fixture();
       try {
-        if (script === "ploi-autodeploy.sh") {
-          const path = join(f.root, "scripts", script);
-          await writeFile(
-            path,
-            (await text(path)).replace("{SITE_DIRECTORY}", f.root).replace("{BRANCH}", "main"),
-          );
-        }
-        const result = await f.run(script);
-        expect(result.code).not.toBe(0);
-        expect(result.aufrufe).toContain("git ls-files --others --exclude-standard");
-        expect(result.aufrufe).not.toContain("git fetch");
-        expect(result.aufrufe).not.toContain("bun install");
-        expect(result.aufrufe).not.toContain("db:migrate");
-        expect(result.aufrufe).not.toContain("kill ");
-        expect(await text(join(f.root, "apps/frontend/dist/index.html"))).toBe("bisherig");
+        if (inhalt === null) await rm(join(f.root, ".env"));
+        else await f.env(inhalt);
+        const r = await f.run();
+        expect(r.code, `${String(inhalt)}: ${r.ausgabe}`).not.toBe(0);
+        expect(r.ausgabe).toContain("Abbruch:");
+        expect(r.ausgabe).not.toContain("fixture-secret-value");
+        if (inhalt?.includes("SCHLECHT")) expect(r.ausgabe).toContain("line 3");
+        expect(r.aufrufe).toBe("");
       } finally {
         await f.dispose();
       }
     }
-  }
-}, 60_000);
+  }, 60_000);
 
-test("Zeitlimit und expliziter Abbruch räumen laufende Fixture-Prozessgruppen auf", async () => {
-  const f = await fixture();
-  try {
-    await writeFile(join(f.root, "scripts/haengt.sh"), "/bin/sleep 60 &\nwait\n");
-    await expect(f.run("haengt.sh", 100)).rejects.toThrow("Zeitlimit überschritten");
-    const laufend = f.run("haengt.sh");
-    await f.dispose();
-    await expect(laufend).rejects.toThrow("abgebrochen");
-    expect(await Bun.file(join(f.root, ".env")).exists()).toBe(false);
-    await f.dispose();
-  } finally {
-    await f.dispose();
-  }
-}, 30_000);
+  test("NODE_ENV muss in der .env auf production stehen", async () => {
+    const f = await fixture();
+    try {
+      await f.env(produktionsEnv.replace("NODE_ENV=production", "NODE_ENV=development"));
+      const r = await f.run();
+      expect(r.code).not.toBe(0);
+      expect(r.ausgabe).toContain("NODE_ENV=production");
+      expect(r.aufrufe).toBe("");
+    } finally {
+      await f.dispose();
+    }
+  }, 30_000);
+
+  test("Bun-Pin, RESET_DB, PORT, DATABASE_URL und PLOI_WORKER_ID werden vor der Installation geprüft", async () => {
+    for (const fall of [
+      { vars: { FIXTURE_VERSION: "1.4.1" }, meldung: "Bun 1.4.2 erforderlich" },
+      { env: produktionsEnv + "RESET_DB=true\n", meldung: "RESET_DB" },
+      { env: produktionsEnv.replace("PORT=3005", "PORT=65536"), meldung: "PORT" },
+      { env: produktionsEnv.replace(/DATABASE_URL=.*\n/, ""), meldung: "DATABASE_URL" },
+      { env: produktionsEnv.replace(/PLOI_WORKER_ID=.*\n/, ""), meldung: "PLOI_WORKER_ID" },
+      {
+        env: produktionsEnv.replace("PLOI_WORKER_ID=123", "PLOI_WORKER_ID=worker-123"),
+        meldung: "Zahl",
+      },
+    ]) {
+      const f = await fixture(fall.vars ?? {});
+      try {
+        if (fall.env) await f.env(fall.env);
+        const r = await f.run();
+        expect(r.code, JSON.stringify(fall)).not.toBe(0);
+        expect(r.ausgabe).toContain(fall.meldung);
+        expect(r.aufrufe).not.toContain("bun install");
+        expect(r.aufrufe).not.toContain("supervisorctl stop");
+        await unveraendert(f.root);
+      } finally {
+        await f.dispose();
+      }
+    }
+  }, 60_000);
+
+  test("Worker-Vorprüfung: unbekanntes Programm, fehlende sudo-Freigabe und fremdes Projekt stoppen vor der Installation", async () => {
+    for (const fall of ["missing", "denied", "foreign"]) {
+      const f = await fixture({ FIXTURE_WORKER: fall });
+      try {
+        const r = await f.run();
+        expect(r.code, fall).not.toBe(0);
+        expect(r.aufrufe).toContain("sudo -n /usr/bin/supervisorctl status worker-123:*");
+        expect(r.aufrufe).not.toContain("bun install");
+        expect(r.aufrufe).not.toContain("supervisorctl stop");
+        expect(r.aufrufe).not.toContain("supervisorctl start");
+        if (fall === "foreign") expect(r.ausgabe).toContain("anderen Projekt");
+        await unveraendert(f.root);
+      } finally {
+        await f.dispose();
+      }
+    }
+  }, 60_000);
+
+  test("versionierte Abweichungen und unversionierte Quelldateien brechen ab; Plois Hook-Datei ist nur ein Hinweis", async () => {
+    for (const vars of [{ FIXTURE_MODIFIED: "1" }, { FIXTURE_UNTRACKED_SRC: "1" }]) {
+      const f = await fixture(vars);
+      try {
+        const r = await f.run();
+        expect(r.code).not.toBe(0);
+        expect(r.aufrufe).not.toContain("bun install");
+        await unveraendert(f.root);
+      } finally {
+        await f.dispose();
+      }
+    }
+    const f = await fixture({ FIXTURE_UNTRACKED: "1" });
+    try {
+      const r = await f.run();
+      expect(r.code, r.ausgabe).toBe(0);
+      expect(r.ausgabe).toContain("ploi-1a2b3c.sh");
+      expect(r.ausgabe).toContain("Hinweis");
+    } finally {
+      await f.dispose();
+    }
+  }, 60_000);
+
+  test("fehlgeschlagene Gates und Audits lassen Datenbank, Daemon und bisherigen Build unangetastet", async () => {
+    for (const vars of [
+      { FIXTURE_FAIL: "validate-env.ts" },
+      { FIXTURE_FAIL: "run lint" },
+      { FIXTURE_FAIL: "run typecheck" },
+      { FIXTURE_FAIL: "test apps packages" },
+      { FIXTURE_FAIL: "run build" },
+      { FIXTURE_NO_404: "1" },
+      { FIXTURE_HEAD_DRIFT: "1" },
+    ]) {
+      const f = await fixture(vars);
+      try {
+        const r = await f.run();
+        expect(r.code, JSON.stringify(vars)).not.toBe(0);
+        expect(r.aufrufe).toContain("bun install --frozen-lockfile");
+        expect(r.aufrufe).not.toContain("db:migrate");
+        expect(r.aufrufe).not.toContain("supervisorctl stop");
+        expect(r.aufrufe).not.toContain("supervisorctl start");
+        if ("FIXTURE_NO_404" in vars) expect(r.ausgabe).toContain("404.html");
+        if ("FIXTURE_HEAD_DRIFT" in vars) expect(r.ausgabe).toContain("verändert");
+        await unveraendert(f.root);
+      } finally {
+        await f.dispose();
+      }
+    }
+  }, 90_000);
+
+  test("Publikationsfehler stellt dist wieder her, ohne den Daemon anzufassen", async () => {
+    const f = await fixture({ FIXTURE_PUBLISH_FAIL: "1" });
+    try {
+      const r = await f.run();
+      expect(r.code).not.toBe(0);
+      expect(r.aufrufe).toContain("db:migrate");
+      expect(r.aufrufe).not.toContain("supervisorctl stop");
+      expect(await text(join(f.root, "apps/frontend/dist/index.html"))).toBe("bisherig");
+      expect(await text(join(f.root, ".deploy/last-built-sha"))).toBe("vorheriger-erfolg\n");
+      expect(r.ausgabe).toContain("wiederhergestellt");
+    } finally {
+      await f.dispose();
+    }
+  }, 30_000);
+
+  test("Erfolg: Build vor Migration, Migration vor Veröffentlichung, stop+start nur des eigenen Programms, neue PID mit Health, Marker", async () => {
+    const f = await fixture();
+    try {
+      const r = await f.run();
+      expect(r.code, r.ausgabe).toBe(0);
+      const reihenfolge = [
+        "bun install --frozen-lockfile",
+        "bun apps/backend/src/validate-env.ts",
+        "bun run lint",
+        "bun run typecheck",
+        "bun test apps packages",
+        "bun run build --outDir dist.new",
+        "bun run db:migrate",
+        "sudo -n /usr/bin/supervisorctl stop worker-123:*",
+        "sudo -n /usr/bin/supervisorctl start worker-123:*",
+        "curl --fail --silent --max-time 3 --connect-timeout 1 http://127.0.0.1:3005/health",
+      ].map((aufruf) => r.aufrufe.indexOf(aufruf));
+      for (let i = 0; i < reihenfolge.length; i++) {
+        expect(reihenfolge[i], `${i}`).toBeGreaterThanOrEqual(0);
+        if (i > 0) expect(reihenfolge[i]).toBeGreaterThan(reihenfolge[i - 1]!);
+      }
+      expect(r.aufrufe).not.toMatch(/\b(pgrep|pkill|kill) /);
+      expect(r.aufrufe).not.toContain("format:check");
+      expect(r.aufrufe.match(/curl /g)?.length ?? 0).toBeGreaterThanOrEqual(2);
+      expect(await text(join(f.root, "apps/frontend/dist/index.html"))).toBe("neu");
+      expect(await text(join(f.root, "apps/frontend/dist.old/index.html"))).toBe("bisherig");
+      expect(await text(join(f.root, ".deploy/last-built-sha"))).toBe(`${sha}\n`);
+      expect(r.ausgabe).toContain("PID 4712");
+      // Der optionale Daemon-Wrapper startet mit derselben geprüften Umgebung.
+      const daemon = await f.run("start-backend.sh");
+      expect(daemon.code, daemon.ausgabe).toBe(0);
+      expect(daemon.aufrufe).toContain(`daemon ${f.root} production true`);
+    } finally {
+      await f.dispose();
+    }
+  }, 60_000);
+
+  test("gestoppter Daemon (Erstdeploy) wird ohne stop gestartet", async () => {
+    const f = await fixture({ FIXTURE_WORKER: "stopped" });
+    try {
+      const r = await f.run();
+      expect(r.code, r.ausgabe).toBe(0);
+      expect(r.ausgabe).toContain("läuft derzeit nicht");
+      expect(r.aufrufe).not.toContain("supervisorctl stop");
+      expect(r.aufrufe).toContain("supervisorctl start worker-123:*");
+      expect(await text(join(f.root, ".deploy/last-built-sha"))).toBe(`${sha}\n`);
+    } finally {
+      await f.dispose();
+    }
+  }, 30_000);
+
+  test("Backend-Abnahme scheitert bei gleicher PID, Startfehler, instabiler PID, fremder PID oder rotem Health-Check", async () => {
+    for (const vars of [
+      { FIXTURE_WORKER: "unchanged" },
+      { FIXTURE_WORKER: "start-fail" },
+      { FIXTURE_WORKER: "unstable" },
+      { FIXTURE_WORKER: "new-foreign" },
+      { FIXTURE_HEALTH: "fehler" },
+    ]) {
+      const f = await fixture(vars);
+      try {
+        const r = await f.run();
+        expect(r.code, JSON.stringify(vars)).not.toBe(0);
+        expect(r.aufrufe).toContain("db:migrate");
+        expect(r.aufrufe).toContain("supervisorctl start worker-123:*");
+        expect(await text(join(f.root, "apps/frontend/dist/index.html"))).toBe("neu");
+        expect(await text(join(f.root, "apps/frontend/dist.old/index.html"))).toBe("bisherig");
+        expect(await text(join(f.root, ".deploy/last-built-sha"))).toBe("vorheriger-erfolg\n");
+        expect(r.ausgabe).toContain("Backend-Abnahme fehlgeschlagen");
+        if ("FIXTURE_WORKER" in vars && vars.FIXTURE_WORKER === "new-foreign")
+          expect(r.ausgabe).toContain("anderen Projekt");
+      } finally {
+        await f.dispose();
+      }
+    }
+  }, 90_000);
+
+  test.skipIf(!flockProgramm && !pythonProgramm)(
+    "Deploy-Lock: zweiter Deploy wartet höchstens STARTER_LOCK_WAIT und bricht ab; Cronjob setzt währenddessen aus",
+    async () => {
+      const f = await fixture({ FIXTURE_HOLD: "1" });
+      try {
+        const runSh = join(f.root, "scripts/cronjobs/run.sh");
+        await writeFile(runSh, (await text(runSh)).replace("  *)\n", "  demo) ;;\n  *)\n"));
+        const erster = f.run();
+        for (let i = 0; i < 200 && !(await Bun.file(join(f.root, "bereit")).exists()); i++)
+          await Bun.sleep(10);
+        expect(await Bun.file(join(f.root, "bereit")).exists()).toBe(true);
+        const zweiter = await f.run();
+        expect(zweiter.code).not.toBe(0);
+        expect(zweiter.ausgabe).toContain("hält den Lock");
+        const cron = await f.run("cronjobs/run.sh", ["demo"]);
+        expect(cron.code, cron.ausgabe).toBe(0);
+        expect(cron.ausgabe).toContain("setzt aus");
+        expect(cron.aufrufe).not.toContain("jobs/demo.ts");
+        await writeFile(join(f.root, "freigabe"), "1");
+        const fertig = await erster;
+        expect(fertig.code, fertig.ausgabe).toBe(0);
+        expect(fertig.aufrufe.match(/bun install/g)).toHaveLength(1);
+      } finally {
+        await f.dispose();
+      }
+    },
+    60_000,
+  );
+
+  test("Cron-Wrapper: unbekannter Job endet mit Exit 2 ohne Bun-Aufruf; freigeschalteter Job läuft mit Produktionsumgebung", async () => {
+    const f = await fixture();
+    try {
+      const unbekannt = await f.run("cronjobs/run.sh", ["fremd"]);
+      expect(unbekannt.code).toBe(2);
+      expect(unbekannt.aufrufe).toBe("");
+      const runSh = join(f.root, "scripts/cronjobs/run.sh");
+      await writeFile(runSh, (await text(runSh)).replace("  *)\n", "  demo) ;;\n  *)\n"));
+      const job = await f.run("cronjobs/run.sh", ["demo"]);
+      expect(job.code, job.ausgabe).toBe(0);
+      expect(job.aufrufe).toContain("bun run apps/backend/src/jobs/demo.ts");
+      expect(job.ausgabe).toContain("demo beendet (Code 0)");
+      await f.env(produktionsEnv.replace("NODE_ENV=production", "NODE_ENV=development"));
+      await writeFile(join(f.root, "aufrufe"), "");
+      const dev = await f.run("cronjobs/run.sh", ["demo"]);
+      expect(dev.code).not.toBe(0);
+      expect(dev.aufrufe).not.toContain("jobs/demo.ts");
+    } finally {
+      await f.dispose();
+    }
+  }, 60_000);
+
+  test("Ploi-Hook-Spiegel: fetch, reset --hard und Übergabe an deploy.sh", async () => {
+    const f = await fixture();
+    try {
+      const datei = join(f.root, "scripts/ploi-autodeploy.sh");
+      await writeFile(
+        datei,
+        (await text(datei))
+          .replaceAll("{SITE_DIRECTORY}", f.root)
+          .replaceAll("{BRANCH}", "main")
+          .replaceAll("{COMMIT_HASH}", sha),
+      );
+      const r = await f.run("ploi-autodeploy.sh");
+      expect(r.code, r.ausgabe).toBe(0);
+      expect(r.aufrufe.indexOf("git fetch origin")).toBeLessThan(
+        r.aufrufe.indexOf("git reset --hard origin/main"),
+      );
+      expect(r.aufrufe.indexOf("git reset --hard origin/main")).toBeLessThan(
+        r.aufrufe.indexOf("bun --version"),
+      );
+      expect(await text(join(f.root, ".deploy/last-built-sha"))).toBe(`${sha}\n`);
+    } finally {
+      await f.dispose();
+    }
+  }, 30_000);
+
+  test("Zeitlimit und expliziter Abbruch räumen laufende Fixture-Prozessgruppen auf", async () => {
+    const f = await fixture();
+    try {
+      await writeFile(join(f.root, "scripts/haengt.sh"), "/bin/sleep 60 &\nwait\n");
+      await expect(f.run("haengt.sh", [], 100)).rejects.toThrow("Zeitlimit überschritten");
+      const laufend = f.run("haengt.sh");
+      await f.dispose();
+      await expect(laufend).rejects.toThrow("abgebrochen");
+      expect(await Bun.file(join(f.root, ".env")).exists()).toBe(false);
+    } finally {
+      await f.dispose();
+    }
+  }, 30_000);
+});
