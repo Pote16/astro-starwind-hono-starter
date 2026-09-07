@@ -117,26 +117,41 @@ starter_worker() {
 
 # supervisorctl mit passwortloser sudo-Freigabe, ersatzweise direkt. Fehlermeldungen
 # von Supervisor kommen als Text mit Exit 0, deshalb wird die Ausgabe geprüft.
+# STARTER_SUPERVISORCTL_OK nennt einen zusätzlich erlaubten Exitcode; siehe
+# starter_worker_status.
 starter_supervisorctl() {
-  local ausgabe
-  if ausgabe="$(sudo -n /usr/bin/supervisorctl "$@" 2>&1)" \
-    && [[ "$ausgabe" != *"ERROR"* ]] && [[ "$ausgabe" != *"error:"* ]] && [[ "$ausgabe" != *"no such"* ]]; then
-    printf '%s\n' "$ausgabe"
-    return 0
-  fi
-  if ausgabe="$(/usr/bin/supervisorctl "$@" 2>&1)" \
-    && [[ "$ausgabe" != *"ERROR"* ]] && [[ "$ausgabe" != *"error:"* ]] && [[ "$ausgabe" != *"no such"* ]]; then
-    printf '%s\n' "$ausgabe"
-    return 0
-  fi
+  local ausgabe rc versuch
+  for versuch in sudo direkt; do
+    if [ "$versuch" = sudo ]; then
+      ausgabe="$(sudo -n /usr/bin/supervisorctl "$@" 2>&1)" && rc=0 || rc=$?
+    else
+      ausgabe="$(/usr/bin/supervisorctl "$@" 2>&1)" && rc=0 || rc=$?
+    fi
+    if { [ "$rc" -eq 0 ] || [ "$rc" = "${STARTER_SUPERVISORCTL_OK:-}" ]; } \
+      && [[ "$ausgabe" != *"ERROR"* ]] && [[ "$ausgabe" != *"error:"* ]] && [[ "$ausgabe" != *"no such"* ]]; then
+      printf '%s\n' "$ausgabe"
+      return 0
+    fi
+  done
   printf '%s\n' "$ausgabe" >&2
   return 1
+}
+
+# Status des eigenen Programms. `supervisorctl status` endet nach LSB mit Exit 3,
+# sobald einer seiner Prozesse STOPPED, EXITED oder FATAL ist — beim Erstdeploy
+# und nach einem abgestürzten Daemon genau der Zustand, den stop + start
+# repariert. Nur ein unbekanntes Programm (Exit 4, "no such group/process") und
+# eine fehlende sudo-Freigabe dürfen den Deploy stoppen.
+starter_worker_status() {
+  # shellcheck disable=SC2034  # wird per dynamischem Gültigkeitsbereich in starter_supervisorctl gelesen
+  local STARTER_SUPERVISORCTL_OK=3
+  starter_supervisorctl status "$PLOI_WORKER_ZIEL"
 }
 
 # Alle PIDs des eigenen Supervisor-Programms, sortiert, leer wenn gestoppt.
 # Zeile: "worker-123:worker-123_00   RUNNING   pid 4711, uptime 0:00:21"
 starter_worker_pids() {
-  starter_supervisorctl status "$PLOI_WORKER_ZIEL" 2>/dev/null \
+  starter_worker_status 2>/dev/null \
     | awk '{ for (i = 1; i < NF; i++) if ($i == "pid") { gsub(/,/, "", $(i + 1)); print $(i + 1) } }' \
     | sort -n \
     | tr '\n' ' ' \

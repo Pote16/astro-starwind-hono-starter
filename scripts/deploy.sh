@@ -72,7 +72,7 @@ worker_pids_pruefen() {
   done
 }
 printf 'Eigenen Ploi-Daemon prüfen: %s\n' "$PLOI_WORKER_PROGRAM"
-starter_supervisorctl status "$PLOI_WORKER_ZIEL" >/dev/null \
+starter_worker_status >/dev/null \
   || starter_fehler "Supervisor kennt '$PLOI_WORKER_PROGRAM' nicht oder supervisorctl ist nicht freigegeben. Daemon in Ploi anlegen, PLOI_WORKER_ID eintragen und die sudoers-Regel für supervisorctl prüfen (scripts/README.md)."
 ALTE_PIDS="$(starter_worker_pids || true)"
 worker_pids_pruefen "$ALTE_PIDS"
@@ -137,7 +137,7 @@ if [ -n "$ALTE_PIDS" ]; then
     || starter_fehler "Supervisor konnte $PLOI_WORKER_PROGRAM nicht stoppen."
 fi
 if ! starter_supervisorctl start "$PLOI_WORKER_ZIEL" >/dev/null; then
-  WORKER_STATUS="$(starter_supervisorctl status "$PLOI_WORKER_ZIEL" 2>/dev/null || true)"
+  WORKER_STATUS="$(starter_worker_status 2>/dev/null || true)"
   [[ "$WORKER_STATUS" == *RUNNING* || "$WORKER_STATUS" == *STARTING* || "$WORKER_STATUS" == *BACKOFF* ]] \
     || starter_fehler "Supervisor konnte $PLOI_WORKER_PROGRAM nicht starten. Daemon-Log in Ploi prüfen."
 fi

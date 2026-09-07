@@ -145,12 +145,14 @@ git() {
   esac
 }
 supervisor_status_zeile() {
-  # Zustand des simulierten Supervisor-Programms worker-123.
+  # Zustand des simulierten Supervisor-Programms worker-123. Die Exitcodes sind
+  # die von supervisorctl: 0 nur, solange alle Prozesse laufen, 3 (LSB "not
+  # running") bei STOPPED/EXITED/FATAL und 4 bei unbekanntem Programm.
   local modus="\${FIXTURE_WORKER:-ok}" gestartet=0 zaehler
   [ -f "$FIXTURE_ROOT/worker-start" ] && gestartet=1
   case "$modus" in
-    missing) printf 'worker-123:*: ERROR (no such process)\\n'; return 1 ;;
-    stopped) if [ "$gestartet" = 1 ]; then printf 'worker-123:worker-123_00   RUNNING   pid 4712, uptime 0:00:01\\n'; else printf 'worker-123:worker-123_00   STOPPED   Sep 07 10:00 AM\\n'; fi; return 0 ;;
+    missing) printf 'worker-123:*: ERROR (no such process)\\n'; return 4 ;;
+    stopped) if [ "$gestartet" = 1 ]; then printf 'worker-123:worker-123_00   RUNNING   pid 4712, uptime 0:00:01\\n'; return 0; else printf 'worker-123:worker-123_00   STOPPED   Sep 07 10:00 AM\\n'; return 3; fi ;;
     foreign) printf 'worker-123:worker-123_00   RUNNING   pid 9999, uptime 0:10:00\\n'; return 0 ;;
     unchanged) printf 'worker-123:worker-123_00   RUNNING   pid 4711, uptime 0:10:00\\n'; return 0 ;;
     new-foreign) if [ "$gestartet" = 1 ]; then printf 'worker-123:worker-123_00   RUNNING   pid 9999, uptime 0:00:01\\n'; else printf 'worker-123:worker-123_00   RUNNING   pid 4711, uptime 0:10:00\\n'; fi; return 0 ;;
@@ -159,7 +161,7 @@ supervisor_status_zeile() {
         zaehler=$(( $(cat "$FIXTURE_ROOT/status-zaehler" 2>/dev/null || echo 0) + 1 )); printf '%s' "$zaehler" > "$FIXTURE_ROOT/status-zaehler"
         printf 'worker-123:worker-123_00   RUNNING   pid %s, uptime 0:00:01\\n' "$((4712 + zaehler))"
       else printf 'worker-123:worker-123_00   RUNNING   pid 4711, uptime 0:10:00\\n'; fi; return 0 ;;
-    start-fail) printf 'worker-123:worker-123_00   FATAL   Exited too quickly\\n'; return 0 ;;
+    start-fail) printf 'worker-123:worker-123_00   FATAL   Exited too quickly\\n'; return 3 ;;
     *) if [ "$gestartet" = 1 ]; then printf 'worker-123:worker-123_00   RUNNING   pid 4712, uptime 0:00:01\\n'; else printf 'worker-123:worker-123_00   RUNNING   pid 4711, uptime 0:10:00\\n'; fi; return 0 ;;
   esac
 }

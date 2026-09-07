@@ -35,6 +35,17 @@ describe("Deploy-Harness-Vertrag", () => {
     expect(common).toContain('PLOI_WORKER_PROGRAM="worker-${PLOI_WORKER_ID}"');
     expect(common).toContain('[ "${NODE_ENV:-}" = "production" ]');
     expect(common).not.toContain("export NODE_ENV=");
+    const deploy = await datei("deploy.sh");
+    // stop + start statt restart: ein gestoppter oder FATAL-Daemon wird so ebenfalls gestartet.
+    expect(deploy).toContain('starter_supervisorctl stop "$PLOI_WORKER_ZIEL"');
+    expect(deploy).toContain('starter_supervisorctl start "$PLOI_WORKER_ZIEL"');
+    // `supervisorctl status` endet nach LSB mit Exit 3, sobald ein Prozess des
+    // Programms gestoppt, EXITED oder FATAL ist. Genau dann muss der Deploy
+    // weiterlaufen, deshalb liest er den Status ausschließlich über
+    // starter_worker_status (toleriert Exit 3) statt direkt.
+    expect(deploy).not.toMatch(/starter_supervisorctl status/);
+    expect(common).toContain("STARTER_SUPERVISORCTL_OK");
+    expect(common).toContain("starter_worker_status() {");
   });
 
   test("Ploi-Hook-Spiegel entspricht dem realen Panel-Script", async () => {
