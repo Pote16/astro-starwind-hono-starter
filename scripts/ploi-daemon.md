@@ -35,13 +35,30 @@ curl -fsSL https://bun.sh/install | bash -s "bun-v1.4.2"
 /home/ploi/.bun-versions/1.4.2/bin/bun --version   # muss 1.4.2 zeigen
 ```
 
-Liegt eine Binärdatei schon flach unter `/home/ploi/.bun-versions/<version>/bun`,
-genügt ein Umzug:
+**Der Installer ist der einzige empfohlene Weg.** Er legt neben `bin/bun` auch
+`bin/bunx` an — einen Symlink auf dieselbe Binärdatei. Liegt eine Binärdatei
+schon flach unter `/home/ploi/.bun-versions/<version>/bun`, entsteht durch
+blosses Verschieben eine halbe Installation: `bun` ist da, `bunx` fehlt. Der
+Deploy fällt seit der Härtung von `BUN_INSTALL` nicht mehr still auf
+`$HOME/.bun` zurück, also bricht er dann mitten drin ab mit
+`bunx: command not found` (Exit 127). Wer trotzdem verschiebt, muss den Symlink
+nachziehen:
 
 ```bash
 mkdir -p /home/ploi/.bun-versions/1.4.2/bin
 mv /home/ploi/.bun-versions/1.4.2/bun /home/ploi/.bun-versions/1.4.2/bin/bun
+/home/ploi/.bun-versions/1.4.2/bin/bun completions   # legt bin/bunx an
 ```
+
+Prüfen, ob eine Runtime vollständig ist:
+
+```bash
+ls -l /home/ploi/.bun-versions/1.4.2/bin/   # nur "bun" ohne "bunx" = unvollständig
+```
+
+Die Scripts dieses Projekts rufen `bun x` statt `bunx` auf; das ist derselbe
+Befehl und braucht den Symlink nicht. Für interaktives Arbeiten auf dem Server
+ist er trotzdem angenehm.
 
 ### Der Fallstrick mit verschachtelten Aufrufen
 

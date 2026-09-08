@@ -8,7 +8,7 @@
     "build": "bun --bun run --filter '*' build",
     "audit:seo": "bun apps/frontend/tools/pruefe-seo.ts",
     "lint": "bun --bun run --filter '*' lint && bun --bun eslint e2e playwright.config.ts",
-    "lint:fix": "bunx --bun eslint apps/backend/src apps/frontend/src packages/db/src packages/logger/src --fix",
+    "lint:fix": "bun x --bun eslint apps/backend/src apps/frontend/src packages/db/src packages/logger/src --fix",
     "outdated": "bun outdated --filter '*'",
     "typecheck": "bun --bun run --filter '*' typecheck && bun run typecheck:e2e",
     "db:generate": "bun --bun run --filter @ho-setup/db db:generate",
@@ -17,7 +17,7 @@
     "test": "bun test",
     "format": "bun --bun prettier --write .",
     "format:check": "bun --bun prettier --check .",
-    "test:e2e": "bun run typecheck:e2e && bunx playwright test",
+    "test:e2e": "bun run typecheck:e2e && bun x playwright test",
     "typecheck:e2e": "bun --bun tsc --project e2e/tsconfig.json"
   },
   "devDependencies": {

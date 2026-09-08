@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 
 import { describe, expect, test } from "bun:test";
 
@@ -141,6 +141,50 @@ describe("Deploy-Harness-Vertrag", () => {
     for (const pfad of ["../apps/frontend/src/content.config.ts"]) {
       const inhalt = await datei(pfad).catch(() => "");
       if (inhalt) expect(inhalt).not.toMatch(/import \{[^}]*\bz\b[^}]*\} from "astro:content"/);
+    }
+  });
+  test("Kein bunx: die versionierte Runtime hat den Symlink nicht zwangsläufig", async () => {
+    // bunx ist keine eigene Binärdatei, sondern ein Symlink auf bun, den nur Buns
+    // Installer anlegt. Entsteht eine Runtime unter
+    // /home/ploi/.bun-versions/<version>/ durch Verschieben einer flachen
+    // Binärdatei, liegt dort bun, aber kein bunx. Solange ein fehlendes
+    // BUN_INSTALL still auf $HOME/.bun zurückfiel, kam der Symlink aus der alten
+    // gemeinsamen Installation; seit dieser Rückfall weg ist, bricht der Deploy
+    // mitten drin ab mit "bunx: command not found" (Exit 127) — der PATH stimmt
+    // ja, nur der Symlink fehlt. `bun x` ist derselbe Befehl und braucht ihn nicht.
+    const bunx = /(?<![\w./-])bunx\s/;
+    const paketdateien = ["../package.json"];
+    for (const ordner of ["../apps", "../packages"]) {
+      let eintraege: string[] = [];
+      try {
+        eintraege = await readdir(new URL(`${ordner}/`, import.meta.url));
+      } catch {
+        continue;
+      }
+      for (const eintrag of eintraege) paketdateien.push(`${ordner}/${eintrag}/package.json`);
+    }
+    let geprueft = 0;
+    for (const pfad of paketdateien) {
+      let inhalt: string;
+      try {
+        inhalt = await datei(pfad);
+      } catch {
+        continue;
+      }
+      geprueft += 1;
+      const scripts = (JSON.parse(inhalt) as { scripts?: Record<string, string> }).scripts ?? {};
+      for (const [name, befehl] of Object.entries(scripts))
+        expect(befehl, `${pfad} -> ${name}`).not.toMatch(bunx);
+    }
+    expect(geprueft).toBeGreaterThan(1);
+    for (const name of ["deploy.sh", "deploy-common.sh", "start-backend.sh", "cronjobs/run.sh"]) {
+      let inhalt: string;
+      try {
+        inhalt = await datei(name);
+      } catch {
+        continue;
+      }
+      expect(inhalt, name).not.toMatch(/^[^#\n]*(?<![\w./-])bunx\s/m);
     }
   });
 });
