@@ -16,6 +16,10 @@ cd "$ROOT_DIR"
 # shellcheck source=scripts/deploy-common.sh
 source "$SCRIPT_DIR/deploy-common.sh"
 
+# Im Deploy ist ein Abbruch folgenlos: es ist noch nichts verändert. Deshalb
+# darf hier ein unbrauchbares BUN_INSTALL hart scheitern, während der
+# Daemon-Einstieg und die Cronjobs nur einen Hinweis geben.
+STARTER_STRENG=1
 starter_umgebung
 starter_runtime
 [ "${RESET_DB:-false}" = "false" ] || starter_fehler "RESET_DB ist im Produktionsdeploy verboten. Ausschließlich versionierte Migrationen verwenden."

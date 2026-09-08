@@ -23,22 +23,51 @@ starter_hinweis() {
 # Sonderzeichen gehören in doppelte Anführungszeichen. Ein Syntaxfehler bricht
 # ab und meldet ausschließlich die Zeilennummer.
 starter_umgebung() {
-  local env_datei="$ROOT_DIR/.env" fehler_datei zeile
+  local env_datei="$ROOT_DIR/.env" fehler_datei zeilen
   [ -f "$env_datei" ] || starter_fehler ".env im Projektroot fehlt (Ploi: Site -> Environment)."
   [ ! -L "$ROOT_DIR/.deploy" ] || starter_fehler ".deploy darf kein Symlink sein."
   mkdir -p "$ROOT_DIR/.deploy"
   fehler_datei="$ROOT_DIR/.deploy/env-fehler.log"
   (umask 077; : > "$fehler_datei")
 
+  # Wagenrückläufe zuerst. Sie sind unsichtbar und hängen sich an JEDEN Wert.
+  # Ohne diese Prüfung meldet die Zeile weiter unten "NODE_ENV muss production
+  # setzen (gefunden: 'production')" — eine Meldung, die sich selbst widerspricht.
+  if LC_ALL=C grep -q "$(printf '\r')" "$env_datei"; then
+    rm -f "$fehler_datei"
+    starter_fehler ".env enthält Wagenrückläufe (Zeilenenden aus Windows). Jeder Wert bekommt dadurch ein unsichtbares Zeichen angehängt. Nächster Schritt: den Inhalt in Ploi -> Site -> Environment neu eintragen, ohne ihn aus einer Windows-Datei zu übernehmen."
+  fi
+
+  # Herkunft von BUN_INSTALL unterscheidbar machen. Ohne das kann die spätere
+  # Meldung nicht sagen, ob der Wert aus der Ploi-Environment stammt oder aus der
+  # Umgebung des aufrufenden Prozesses. Eine leere Zuweisung in der .env zählt
+  # dabei als gesetzt: der Betreiber sieht die Zeile in der Maske.
+  starter_bun_vorher="${BUN_INSTALL-}"
+  starter_bun_vorher_gesetzt="nein"
+  [ -z "${BUN_INSTALL+ja}" ] || starter_bun_vorher_gesetzt="ja"
+  unset BUN_INSTALL
+
   set -a
   # shellcheck disable=SC1090,SC1091
   if ! source "$env_datei" 2>"$fehler_datei"; then
     set +a
-    zeile="$(grep -oE 'line [0-9]+' "$fehler_datei" | head -n 1 || true)"
+    zeilen="$(grep -oE 'line [0-9]+' "$fehler_datei" | grep -oE '[0-9]+' | sort -n -u | tr '\n' ' ' | sed 's/ $//')"
     rm -f "$fehler_datei"
-    starter_fehler ".env konnte nicht geladen werden (${zeile:-Position unbekannt}). Werte mit Leerzeichen/Sonderzeichen in doppelte Anführungszeichen setzen; Werte werden nicht protokolliert."
+    starter_fehler ".env konnte nicht geladen werden (Zeile ${zeilen:-unbekannt}). Werte mit Leerzeichen oder Sonderzeichen in doppelte Anführungszeichen setzen; Werte werden nicht protokolliert."
   fi
   set +a
+
+  # `source` liefert den Exitstatus der LETZTEN Zeile. Eine fehlerhafte Zeile in
+  # der Mitte — etwa "BUN_INSTALL = /pfad" mit Leerzeichen um das
+  # Gleichheitszeichen — setzt nichts und bliebe sonst folgenlos: die Variable
+  # fehlt, der Deploy meldet später einen ganz anderen Grund. Deshalb zählt hier
+  # die aufgefangene Ausgabe, nicht nur der Status. Gemeldet werden
+  # ausschließlich Zeilennummern, nie Namen oder Werte.
+  if [ -s "$fehler_datei" ]; then
+    zeilen="$(grep -oE 'line [0-9]+' "$fehler_datei" | grep -oE '[0-9]+' | sort -n -u | tr '\n' ' ' | sed 's/ $//')"
+    rm -f "$fehler_datei"
+    starter_fehler ".env enthält Zeilen, die nichts setzen (Zeile ${zeilen:-unbekannt}). Häufigste Ursache sind Leerzeichen um das Gleichheitszeichen. Nächster Schritt: diese Zeilen in Ploi -> Site -> Environment als NAME=wert ohne Leerzeichen schreiben. Werte werden nicht protokolliert."
+  fi
   rm -f "$fehler_datei"
 
   # Der Daemon liest dieselbe Datei. Ein export hier würde nur diesen Prozess
@@ -48,7 +77,64 @@ starter_umgebung() {
     || starter_fehler ".env muss NODE_ENV=production setzen (gefunden: '${NODE_ENV:-<leer>}'). Der Ploi-Daemon liest diese Datei; ein export im Deploy erreicht ihn nicht."
 
   export CI=true
-  export BUN_INSTALL="${BUN_INSTALL:-$HOME/.bun}"
+  starter_bun_install
+}
+
+# Legt BUN_INSTALL fest und stellt $BUN_INSTALL/bin dem PATH voran.
+#
+# BUN_INSTALL zeigt auf das Verzeichnis ÜBER bin/bun, je Site auf die zu
+# .bun-version passende Runtime. Der PATH-Vorrang muss stehen, bevor irgendein
+# Werkzeug läuft: package.json-Scripts rufen "bun" ohne Pfad erneut auf, und
+# diese verschachtelten Aufrufe wählen ihre Version über den PATH des
+# Kindprozesses, nicht über den absoluten Pfad des äußeren Aufrufs.
+#
+# Ein unbrauchbarer Wert bricht nur im Deploy ab (STARTER_STRENG=1); dort ist
+# noch nichts verändert. Im Daemon-Einstieg und in den Cronjobs wäre ein Abbruch
+# teurer als ein Rückfall: Supervisor ginge in FATAL, das Backend käme nicht mehr
+# hoch und Nginx lieferte nur noch das statische Frontend. Dort bleibt es beim
+# Hinweis.
+starter_bun_install() {
+  local quelle grund="" text
+  if [ -n "${BUN_INSTALL+ja}" ]; then
+    quelle=".env, also Ploi -> Site -> Environment"
+  elif [ "${starter_bun_vorher_gesetzt:-nein}" = ja ]; then
+    BUN_INSTALL="$starter_bun_vorher"
+    quelle="Prozessumgebung des Aufrufers"
+  else
+    BUN_INSTALL="$HOME/.bun"
+    quelle="Standard, weil BUN_INSTALL weder in der .env noch in der Umgebung steht"
+  fi
+
+  # Rand-Leerzeichen und Endslashes entstehen beim Eintippen in ein Textfeld.
+  BUN_INSTALL="${BUN_INSTALL#"${BUN_INSTALL%%[![:space:]]*}"}"
+  BUN_INSTALL="${BUN_INSTALL%"${BUN_INSTALL##*[![:space:]]}"}"
+  while [ "$BUN_INSTALL" != "/" ] && [ "${BUN_INSTALL%/}" != "$BUN_INSTALL" ]; do
+    BUN_INSTALL="${BUN_INSTALL%/}"
+  done
+
+  if [ -z "$BUN_INSTALL" ]; then
+    grund="ist leer"
+  elif [ "${BUN_INSTALL#/}" = "$BUN_INSTALL" ]; then
+    # Ein relativer Pfad im PATH zeigt in jedem Unterverzeichnis woanders hin.
+    # Der Frontend-Build läuft in apps/frontend und fiele dort still auf die
+    # gemeinsame alte Installation zurück.
+    grund="ist kein absoluter Pfad"
+  elif [ "${BUN_INSTALL#*:}" != "$BUN_INSTALL" ]; then
+    grund="enthält einen Doppelpunkt und würde den PATH zerlegen"
+  elif [ ! -x "$BUN_INSTALL/bin/bun" ]; then
+    grund="enthält kein ausführbares bin/bun"
+  fi
+
+  if [ -n "$grund" ]; then
+    text="BUN_INSTALL=$BUN_INSTALL (Quelle: $quelle) $grund. Nächster Schritt: in Ploi -> Site -> Environment den Pfad auf das Verzeichnis setzen, UNTER dem bin/bun liegt — weder auf das bin-Verzeichnis noch auf die Binärdatei selbst (scripts/ploi-daemon.md)."
+    [ "${STARTER_STRENG:-0}" != "1" ] || starter_fehler "$text"
+    starter_hinweis "$text Ersatzweise gilt für diesen Lauf $HOME/.bun."
+    BUN_INSTALL="$HOME/.bun"
+    quelle="Rückfall auf den Standard"
+  fi
+
+  STARTER_BUN_QUELLE="$quelle"
+  export BUN_INSTALL STARTER_BUN_QUELLE
   export PATH="$BUN_INSTALL/bin:$PATH"
 }
 
@@ -68,10 +154,16 @@ starter_runtime() {
   [ -s "$ROOT_DIR/.bun-version" ] || starter_fehler ".bun-version fehlt oder ist leer."
   erwartet="$(tr -d '[:space:]' < "$ROOT_DIR/.bun-version")"
   [[ "$erwartet" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || starter_fehler "Ungültiger Bun-Pin in .bun-version."
-  aktuell="$(bun --version 2>/dev/null | tr -d '[:space:]')" || starter_fehler "Bun ist nicht verfügbar (BUN_INSTALL=$BUN_INSTALL erwartet bin/bun darin)."
+  aktuell="$(bun --version 2>/dev/null | tr -d '[:space:]')" \
+    || starter_fehler "Bun ist nicht verfügbar. BUN_INSTALL=$BUN_INSTALL (Quelle: ${STARTER_BUN_QUELLE:-unbekannt}) muss ein ausführbares bin/bun enthalten."
   pfad="$(command -v bun)"
+  # Die Meldung nennt die gemessene Binärdatei und die Herkunft von BUN_INSTALL,
+  # behauptet aber keine Ursache: fehlende Zeile, auskommentierte Zeile, leerer
+  # Wert, Leerzeichen um das Gleichheitszeichen und eine zweite Zeile weiter
+  # unten führen alle hierher. Das Daemon-Kommando kann sie nicht prüfen — es
+  # wird von diesem Skript nie gelesen.
   [ "$aktuell" = "$erwartet" ] \
-    || starter_fehler "Bun $erwartet erforderlich, gefunden $aktuell aus $pfad. In der Ploi-Environment BUN_INSTALL=/home/ploi/.bun-versions/$erwartet setzen (dort muss bin/bun liegen) und denselben Pfad im Daemon-Kommando verwenden; kein globales Upgrade auf dem gemeinsamen Host."
+    || starter_fehler "Bun $erwartet erforderlich (.bun-version), gefunden $aktuell aus $pfad. BUN_INSTALL=$BUN_INSTALL, Quelle: ${STARTER_BUN_QUELLE:-unbekannt}. Nächster Schritt: in Ploi -> Site -> Environment prüfen, ob dort genau die Zeile BUN_INSTALL=/home/ploi/.bun-versions/$erwartet steht — ohne führendes #, ohne Leerzeichen um das Gleichheitszeichen, mit nicht leerem Wert und nur einmal. Kein globales Upgrade auf dem gemeinsamen Host."
 }
 
 # Exklusiver Deploy-Lock. Cronjobs halten denselben Lock geteilt (flock -s -n)

@@ -290,7 +290,7 @@ describe.skipIf(!linux)("deploy.sh", () => {
         expect(r.code, `${String(inhalt)}: ${r.ausgabe}`).not.toBe(0);
         expect(r.ausgabe).toContain("Abbruch:");
         expect(r.ausgabe).not.toContain("fixture-secret-value");
-        if (inhalt?.includes("SCHLECHT")) expect(r.ausgabe).toContain("line 3");
+        if (inhalt?.includes("SCHLECHT")) expect(r.ausgabe).toContain("Zeile 3");
         expect(r.aufrufe).toBe("");
       } finally {
         await f.dispose();
