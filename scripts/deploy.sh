@@ -142,8 +142,12 @@ if [ -n "$ALTE_PIDS" ]; then
 fi
 if ! starter_supervisorctl start "$PLOI_WORKER_ZIEL" >/dev/null; then
   WORKER_STATUS="$(starter_worker_status 2>/dev/null || true)"
-  [[ "$WORKER_STATUS" == *RUNNING* || "$WORKER_STATUS" == *STARTING* || "$WORKER_STATUS" == *BACKOFF* ]] \
-    || starter_fehler "Supervisor konnte $PLOI_WORKER_PROGRAM nicht starten. Daemon-Log in Ploi prüfen."
+  # BACKOFF zaehlt bewusst NICHT als gestartet: der Prozess stirbt dort in einer
+  # Schleife, meist weil der Port noch von einem alten Prozessmanager gehalten
+  # wird. Ohne diese Unterscheidung endet der Deploy erst 60 s spaeter im
+  # Health-Check und nennt die Ursache nicht.
+  [[ "$WORKER_STATUS" == *RUNNING* || "$WORKER_STATUS" == *STARTING* ]] \
+    || starter_fehler "Supervisor konnte $PLOI_WORKER_PROGRAM nicht starten (Status: ${WORKER_STATUS:-keine Antwort}). Pruefen, ob Port $PORT noch von einem anderen Prozess gehalten wird. Welcher Prozess ihn belegt, zeigt: ss -ltnp | grep :$PORT ; dazu das Daemon-Log in Ploi lesen."
 fi
 
 # Ein grüner Health-Check allein würde auch ein nie ersetzter Prozess liefern.

@@ -212,19 +212,23 @@ starter_worker() {
 # STARTER_SUPERVISORCTL_OK nennt einen zusätzlich erlaubten Exitcode; siehe
 # starter_worker_status.
 starter_supervisorctl() {
-  local ausgabe rc versuch
-  for versuch in sudo direkt; do
-    if [ "$versuch" = sudo ]; then
-      ausgabe="$(sudo -n /usr/bin/supervisorctl "$@" 2>&1)" && rc=0 || rc=$?
-    else
-      ausgabe="$(/usr/bin/supervisorctl "$@" 2>&1)" && rc=0 || rc=$?
-    fi
-    if { [ "$rc" -eq 0 ] || [ "$rc" = "${STARTER_SUPERVISORCTL_OK:-}" ]; } \
-      && [[ "$ausgabe" != *"ERROR"* ]] && [[ "$ausgabe" != *"error:"* ]] && [[ "$ausgabe" != *"no such"* ]]; then
-      printf '%s\n' "$ausgabe"
-      return 0
-    fi
-  done
+  local ausgabe rc
+  ausgabe="$(sudo -n /usr/bin/supervisorctl "$@" 2>&1)" && rc=0 || rc=$?
+  # Der Versuch ohne sudo laeuft NUR, wenn sudo selbst nicht durfte. Lief
+  # supervisorctl und meldete ein Problem, ist genau diese Meldung die Wahrheit.
+  # Ein zweiter Versuch ueberschriebe sie sonst mit einem irrefuehrenden
+  # PermissionError auf den Supervisor-Socket, den der Benutzer ploi nicht
+  # oeffnen darf - so verdeckte am 8.9.2026 ein "ERROR (abnormal termination)"
+  # des Daemons seine eigene Ursache.
+  if [[ "$ausgabe" == sudo:* ]] || [[ "$ausgabe" == *"a password is required"* ]] \
+    || [[ "$ausgabe" == *"not allowed to execute"* ]] || [[ "$ausgabe" == *"command not found"* ]]; then
+    ausgabe="$(/usr/bin/supervisorctl "$@" 2>&1)" && rc=0 || rc=$?
+  fi
+  if { [ "$rc" -eq 0 ] || [ "$rc" = "${STARTER_SUPERVISORCTL_OK:-}" ]; } \
+    && [[ "$ausgabe" != *"ERROR"* ]] && [[ "$ausgabe" != *"error:"* ]] && [[ "$ausgabe" != *"no such"* ]]; then
+    printf '%s\n' "$ausgabe"
+    return 0
+  fi
   printf '%s\n' "$ausgabe" >&2
   return 1
 }
