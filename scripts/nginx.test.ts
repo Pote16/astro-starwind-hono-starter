@@ -57,11 +57,13 @@ test.skipIf(!nginx)(
         "index.html": "Deutsch",
         "en/index.html": "English",
         "404.html": "Seite nicht gefunden",
+        "gross.html": "<!doctype html><title>Gross</title>" + "<p>Inhalt</p>".repeat(60),
         "robots.txt": "User-agent: *\nAllow: /\n",
         "sitemap-index.xml": "<sitemapindex/>",
         "site.webmanifest": "{}",
         "llms.txt": "# Test",
-        "_astro/app.123.css": "body {}",
+        "_astro/app.123.css": "body { color: #000; }\n".repeat(40),
+        "schrift.woff2": "wOF2".padEnd(600, "x"),
         "logo.svg": "<svg></svg>",
         ".secret": "vertraulich",
         ".hidden/x.css": "geheim",
@@ -73,7 +75,6 @@ test.skipIf(!nginx)(
       const lokal = referenz
         .replace(/^\s*include \/etc\/nginx\/.*;$/gm, "")
         .replace(/^\s*ssl_[^\n]*;$/gm, "")
-        .replace(/^\s*gzip[^\n]*;$/gm, "")
         .replace("#listen 80;", `listen 127.0.0.1:${port};`)
         .replaceAll("__DOMAIN__", "localhost")
         .replaceAll("__MAPPREFIX__", "starter")
@@ -94,10 +95,14 @@ test.skipIf(!nginx)(
           .filter((modul) => !bauoptionen.includes(`--without-http_${modul}_module`))
           .map((modul) => `${modul}_temp_path ${verzeichnis}/${modul};`),
       ].join("\n");
+      // Die Typkarte bildet /etc/nginx/mime.types nach, nicht mehr: font/woff2
+      // steht dort wirklich drin, .webmanifest bis heute nicht. Deshalb fehlt
+      // webmanifest hier bewusst — den Typ muss der Vhost selbst setzen,
+      // sonst geht das Manifest als application/octet-stream raus.
       const config = join(verzeichnis, "nginx.conf");
       await writeFile(
         config,
-        `daemon off;\nmaster_process off;\nerror_log ${verzeichnis}/error.log error;\npid ${verzeichnis}/nginx.pid;\nevents {}\nhttp {\n${tempPfade}\ntypes { text/html html; text/css css; image/svg+xml svg; text/plain txt; application/xml xml; application/manifest+json webmanifest; }\n${lokal}\n}`,
+        `daemon off;\nmaster_process off;\nerror_log ${verzeichnis}/error.log error;\npid ${verzeichnis}/nginx.pid;\nevents {}\nhttp {\n${tempPfade}\ntypes { text/html html; text/css css; image/svg+xml svg; text/plain txt; application/xml xml; font/woff2 woff2; }\n${lokal}\n}`,
       );
       const syntax = Bun.spawn(
         [nginx, "-e", join(verzeichnis, "error.log"), "-t", "-p", `${verzeichnis}/`, "-c", config],
@@ -186,6 +191,18 @@ test.skipIf(!nginx)(
       expect(unbekannt.headers.get("cache-control")).toBe("no-store, no-cache, must-revalidate");
       erwarteSicherheitsHeader(unbekannt, "/unbekannt");
       expect((await fetch(ursprung + "/404.html")).status).toBe(404);
+
+      // gzip wird sonst nirgends gemessen. Der Vhost schaltet es selbst ein; die
+      // Typliste steht dort und nicht in der http-Ebene dieser Testkonfiguration.
+      const holeMitGzip = (pfad: string) =>
+        fetch(ursprung + pfad, { headers: { "Accept-Encoding": "gzip" } });
+      const htmlGzip = await holeMitGzip("/gross.html");
+      expect(htmlGzip.headers.get("content-encoding")).toBe("gzip");
+      const cssGzip = await holeMitGzip("/_astro/app.123.css");
+      expect(cssGzip.headers.get("content-encoding")).toBe("gzip");
+      // Bereits komprimierte Formate bleiben unangetastet: erneutes Packen kostet
+      // nur Rechenzeit und macht die Datei eher groesser.
+      expect((await holeMitGzip("/schrift.woff2")).headers.get("content-encoding")).toBeNull();
 
       // Versteckte Dateien bleiben gesperrt, auch mit Asset- oder HTML-Endung.
       for (const pfad of ["/.secret", "/.hidden/x.css", "/.geheim.html"])
