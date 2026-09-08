@@ -127,4 +127,20 @@ describe("Deploy-Harness-Vertrag", () => {
     expect(workflow).toContain("scripts/cronjobs/*.sh");
     expect(workflow).toContain("shellcheck");
   });
+
+  test("Astro überschreibt die Bildklassen nicht mit eigenen Layoutstilen", async () => {
+    const config = await datei("../apps/frontend/astro.config.mjs");
+    // responsiveStyles: true bettet rund 30 Regeln auf [data-astro-image] in jede
+    // Seite ein, darunter height: auto und aspect-ratio aus den Bildmaßen. Die
+    // schlagen die Tailwind-Klassen am Bild: eines mit "size-full object-cover",
+    // das seine Karte füllen soll, fällt auf seine natürliche Höhe zurück. Am
+    // 8.9.2026 auf der Startseite von cleanlist.app aufgefallen. srcset und sizes
+    // erzeugt layout: "constrained" unabhängig davon weiter.
+    expect(config).not.toMatch(/responsiveStyles:\s*true/);
+    // z aus astro:content ist seit Astro 6 abgekündigt; Ersatz ist astro/zod.
+    for (const pfad of ["../apps/frontend/src/content.config.ts"]) {
+      const inhalt = await datei(pfad).catch(() => "");
+      if (inhalt) expect(inhalt).not.toMatch(/import \{[^}]*\bz\b[^}]*\} from "astro:content"/);
+    }
+  });
 });

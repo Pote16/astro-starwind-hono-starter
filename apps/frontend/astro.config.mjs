@@ -108,7 +108,17 @@ export default defineConfig({
     }),
   ],
   // Bilder aus src/assets erhalten automatisch srcset/sizes und feste Maße (CLS).
-  image: { layout: "constrained", responsiveStyles: true },
+  image: {
+    layout: "constrained",
+    // responsiveStyles bleibt aus. Astro spritzt damit sonst rund 30 CSS-Regeln auf
+    // [data-astro-image] in jede Seite, die height: auto und aspect-ratio erzwingen.
+    // Diese Regeln schlagen die Tailwind-Klassen der Bilder: ein Bild mit
+    // "size-full object-cover", das seine Karte fuellen soll, faellt auf seine
+    // natuerliche Hoehe zurueck. Aufgefallen am 8.9.2026 auf der Startseite.
+    // srcset und sizes erzeugt layout: "constrained" unabhaengig davon weiter;
+    // die Groesse bestimmen hier die Klassen am Bild.
+    responsiveStyles: false,
+  },
   // Fonts-API statt CSS-Import: eine Variable-Font-Datei (latin, woff2), Preload
   // im Layout, metrisch angepasster Fallback gegen Layoutsprünge beim Swap.
   fonts: [
