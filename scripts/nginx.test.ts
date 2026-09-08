@@ -41,12 +41,26 @@ test.skipIf(!nginx)(
     const backend = Bun.serve({
       hostname: "127.0.0.1",
       port: 0,
+      // Das Backend schickt über hono/secure-headers eigene Kopien dieser Header.
+      // Nginx hängt seine an, statt sie zu ersetzen; ohne proxy_hide_header stünden
+      // sie doppelt in der Antwort, und Headers.get() verbindet Duplikate mit ", ".
+      // Die Werte hier sind deshalb absichtlich andere als die des Vhosts.
       fetch: (request) =>
-        Response.json({
-          pfad: new URL(request.url).pathname,
-          proxyIp: request.headers.get("x-forwarded-for"),
-          requestId: request.headers.get("x-request-id") !== null,
-        }),
+        Response.json(
+          {
+            pfad: new URL(request.url).pathname,
+            proxyIp: request.headers.get("x-forwarded-for"),
+            requestId: request.headers.get("x-request-id") !== null,
+          },
+          {
+            headers: {
+              "Referrer-Policy": "no-referrer",
+              "Strict-Transport-Security": "max-age=15552000; includeSubDomains",
+              "X-Content-Type-Options": "nosniff",
+              "X-Frame-Options": "DENY",
+            },
+          },
+        ),
     });
     try {
       const port = await freierPort();
@@ -150,6 +164,7 @@ test.skipIf(!nginx)(
         });
         expect(antwort.status, pfad).toBe(200);
         expect(antwort.headers.get("location")).toBeNull();
+        erwarteSicherheitsHeader(antwort, pfad);
         expect(await antwort.json()).toEqual({
           pfad,
           proxyIp: "127.0.0.1",
