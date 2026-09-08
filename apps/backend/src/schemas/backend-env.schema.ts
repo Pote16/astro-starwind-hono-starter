@@ -42,10 +42,18 @@ function invalidEnvironment(grund: string): never {
   throw new Error(`Backend-Konfiguration ungültig: ${grund}. Werte werden nicht ausgegeben.`);
 }
 
+function felderAus(fehler: z.ZodError): string {
+  // Nur die Pfade aus den Zod-Issues, nie die Werte. Doppelte Nennungen fallen
+  // weg, wenn ein Feld mehrere Regeln verletzt; die Reihenfolge bleibt die des
+  // Schemas, damit die Meldung zwischen zwei Laeufen vergleichbar ist.
+  const felder = [...new Set(fehler.issues.map((issue) => issue.path.join(".") || "(Wurzel)"))];
+  return felder.join(", ");
+}
+
 export function loadBackendEnvironment(input: unknown = process.env): BackendEnvironment {
   const parsed = environmentSchema.safeParse(input);
   if (!parsed.success)
-    return invalidEnvironment("NODE_ENV, PORT oder LOG_LEVEL passen nicht zum Schema");
+    return invalidEnvironment(`diese Felder passen nicht zum Schema: ${felderAus(parsed.error)}`);
   // Ein halbes Schlüsselpaar würde entweder alle Formulare sperren oder nur
   // im Browser Schutz vortäuschen. Ohne beide Schlüssel bleibt die Demo nutzbar.
   if (
