@@ -193,4 +193,38 @@ describe("Deploy-Harness-Vertrag", () => {
       expect(inhalt, name).not.toMatch(/^[^#\n]*(?<![\w./-])bunx\s/m);
     }
   });
+
+  // Dieses Projekt lädt die .env nicht selbst — Bun tut es, und Bun löst dabei
+  // ${VAR} auf. Führt eine abgeleitete Site ein env.ts mit dotenv ein, muss
+  // dotenv-expand dazu: dotenv allein reicht ${VAR} wörtlich durch. In Produktion
+  // fällt das nicht auf, weil Bun die Werte längst gesetzt hat und dotenv
+  // Gesetztes nicht überschreibt — aber startup.test.ts startet das Backend mit
+  // --no-env-file, und dann ist dotenv die einzige Quelle. Am 8.9.2026 scheiterte
+  // eine abgeleitete Site genau daran, während dieselbe .env-Form auf demselben
+  // Server überall sonst lief; die Meldung zeigte auf die Environment, die stimmte.
+  test("env.ts löst Verweise in der .env auf, wenn es die Datei selbst lädt", async () => {
+    let inhalt: string;
+    try {
+      inhalt = await datei("../apps/backend/src/env.ts");
+    } catch {
+      return; // Kein env.ts: allein Bun lädt die Datei und löst selbst auf.
+    }
+    if (!/\bconfig\s*\(/.test(inhalt)) return; // Kein dotenv-Aufruf, nichts zu prüfen.
+    expect(inhalt, "dotenv ohne dotenv-expand").toContain("dotenv-expand");
+    expect(inhalt, "expand() wird nicht aufgerufen").toMatch(/\bexpand\s*\(/);
+  });
+
+  // dotenv steht sonst als unbenutzte Abhängigkeit herum und lädt geradezu dazu
+  // ein, sie ohne dotenv-expand zu verkabeln.
+  test("dotenv ist keine Abhängigkeit, solange es niemand benutzt", async () => {
+    const paket = JSON.parse(await datei("../apps/backend/package.json")) as {
+      dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+    };
+    const abhaengig = { ...paket.dependencies, ...paket.devDependencies };
+    if (!("dotenv" in abhaengig)) return;
+    expect(abhaengig, "dotenv ohne dotenv-expand in den Abhängigkeiten").toHaveProperty(
+      "dotenv-expand",
+    );
+  });
 });

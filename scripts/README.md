@@ -30,6 +30,11 @@ was im Ploi-Panel steht, wird hier gespiegelt und von Hand synchron gehalten.
 - **Umgebung.** Ploi schreibt `Site → Environment` nach `.env`. Diese Datei lesen
   Deploy, Cronjobs **und** der Daemon. Deshalb muss dort `NODE_ENV=production`
   stehen; `deploy.sh` bricht sonst ab. Struktur siehe `.env.example`.
+  Werte dürfen aus Teilen zusammengesetzt sein (`DATABASE_URL=…${POSTGRES_USER}…`):
+  Bash beim `source` und Bun beim Laden lösen das beide auf. **dotenv nicht** —
+  dieses Projekt benutzt es deshalb gar nicht. Wer es einführt, braucht
+  `dotenv-expand` dazu, sonst kippt der Startup-Test (Begründung im Kopf von
+  `.env.example`, geprüft von `harness.test.ts`).
 - **Daemon.** `Site → Daemons`: Command `bun run apps/backend/src/index.ts`,
   Directory = Site-Verzeichnis, Processes `1`, User `ploi`, Environment file leer.
   Supervisor nennt das Programm `worker-<id>`; die `<id>` aus der Ploi-Oberfläche
