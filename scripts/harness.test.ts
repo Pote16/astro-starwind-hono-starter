@@ -97,6 +97,12 @@ describe("Deploy-Harness-Vertrag", () => {
     expect(code).not.toMatch(/Connection\s+'upgrade'/);
     expect(code).not.toMatch(/try_files[^\n]*\/404\.html/);
     expect(code).toContain("error_page 404 /404.html;");
+    // Das Ploi-Feld enthält die ganze Datei. Bleibt beim Einsetzen der von Ploi
+    // erzeugte Kopf stehen, steht root zweimal im selben Server-Block und nginx
+    // lehnt ab. Die Referenz selbst muss deshalb genau eines von beidem führen.
+    expect(code.match(/^\s*root\s/gm) ?? []).toHaveLength(1);
+    expect(code.match(/^server \{/gm) ?? []).toHaveLength(1);
+    expect(code.match(/^\s*index\s/gm) ?? []).toHaveLength(1);
     expect(code).toContain("location = /404.html { internal; }");
     expect(code).toContain("map $sent_http_content_type $__MAPPREFIX___html_cache");
     expect(code).toContain("proxy_set_header X-Forwarded-For $remote_addr;");
