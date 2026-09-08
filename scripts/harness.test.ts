@@ -155,7 +155,7 @@ describe("Deploy-Harness-Vertrag", () => {
     const bunx = /(?<![\w./-])bunx\s/;
     const paketdateien = ["../package.json"];
     for (const ordner of ["../apps", "../packages"]) {
-      let eintraege: string[] = [];
+      let eintraege: string[];
       try {
         eintraege = await readdir(new URL(`${ordner}/`, import.meta.url));
       } catch {

@@ -35,30 +35,37 @@ export interface BackendEnvironment {
   frontendOrigins: string[];
 }
 
-function invalidEnvironment(): never {
-  // Fehler dürfen keine versehentlich in Origins eingefügten Zugangsdaten enthalten.
-  throw new Error(
-    "Backend-Konfiguration ungültig: NODE_ENV, PORT, FRONTEND_ORIGINS, TRUSTED_PROXY_HOPS und das Turnstile-Schlüsselpaar prüfen.",
-  );
+function invalidEnvironment(grund: string): never {
+  // Der Grund nennt das Feld, nie den Wert: in einer URL können Zugangsdaten
+  // stehen. Vorher zählte die Meldung alle Felder auf, und das tatsächlich
+  // fehlende war am 8.9.2026 nicht einmal darunter.
+  throw new Error(`Backend-Konfiguration ungültig: ${grund}. Werte werden nicht ausgegeben.`);
 }
 
 export function loadBackendEnvironment(input: unknown = process.env): BackendEnvironment {
   const parsed = environmentSchema.safeParse(input);
-  if (!parsed.success) return invalidEnvironment();
+  if (!parsed.success)
+    return invalidEnvironment("NODE_ENV, PORT oder LOG_LEVEL passen nicht zum Schema");
   // Ein halbes Schlüsselpaar würde entweder alle Formulare sperren oder nur
   // im Browser Schutz vortäuschen. Ohne beide Schlüssel bleibt die Demo nutzbar.
   if (
     parsed.data.NODE_ENV === "production" &&
     Boolean(parsed.data.PUBLIC_TURNSTILE_SITE_KEY) !== Boolean(parsed.data.TURNSTILE_SECRET_KEY)
   ) {
-    return invalidEnvironment();
+    return invalidEnvironment(
+      "PUBLIC_TURNSTILE_SITE_KEY und TURNSTILE_SECRET_KEY nur gemeinsam setzen",
+    );
   }
   const configuredOrigins = parsed.data.FRONTEND_ORIGINS?.trim();
-  if (!configuredOrigins && parsed.data.NODE_ENV === "production") return invalidEnvironment();
+  if (!configuredOrigins && parsed.data.NODE_ENV === "production")
+    return invalidEnvironment("FRONTEND_ORIGINS fehlt und ist in Produktion Pflicht");
   const origins = originsSchema.safeParse(
     configuredOrigins ? configuredOrigins.split(",").map((origin) => origin.trim()) : localOrigins,
   );
-  if (!origins.success) return invalidEnvironment();
+  if (!origins.success)
+    return invalidEnvironment(
+      "FRONTEND_ORIGINS enthält einen Eintrag, der keine gültige Origin ist",
+    );
   return {
     port: parsed.data.PORT,
     frontendOrigins: [...new Set(origins.data)],

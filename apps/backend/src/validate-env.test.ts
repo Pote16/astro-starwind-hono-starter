@@ -53,7 +53,7 @@ test("Produktion verlangt beide Turnstile-Schlüssel gemeinsam und verrät keine
   ]) {
     const result = await validate({ ...base, ...keys });
     expect(result.code).toBe(1);
-    expect(result.stderr).toContain("Turnstile-Schlüsselpaar");
+    expect(result.stderr).toContain("TURNSTILE_SECRET_KEY");
     expect(result.stderr).not.toContain("fixture-key");
     expect(result.stdout).toBe("");
   }
